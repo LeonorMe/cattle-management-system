@@ -1,34 +1,57 @@
-# Gradle files
-.gradle/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+.env
+.env.*
+instance/
+.venv/
+venv/
+dist/
 build/
 
-# Local configuration file (sdk path, etc)
-local.properties
+# Alembic
+alembic/versions/*.pyc
 
-# Log/OS Files
+# Node / Frontend
+node_modules/
+dist/
+pnpm-lock.yaml
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Logs
 *.log
 
-# Android Studio generated files and folders
-captures/
-.externalNativeBuild/
-.cxx/
-*.aab
-*.apk
-output-metadata.json
-
-# IntelliJ
-*.iml
+# IDEs
+.vscode/
 .idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
+*.iml
 
-# Keystore files
-*.jks
+# System
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+docker-data/
+
+# Android
+*.apk
 *.keystore
+android/app/build/
+.gradle/
+local.properties
 
-# Google Services (e.g. APIs or Firebase)
-google-services.json
+# Coverage
+.coverage
+coverage/
+htmlcov/
 
-# Android Profiling
-*.hprof
+# PWA cache folders
+sw.js.map
+.wrk/
