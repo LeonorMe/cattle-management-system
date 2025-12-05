@@ -1,0 +1,25 @@
+name: WebApp CI
+
+on:
+  push:
+    paths:
+      - "webapp/**"
+  pull_request:
+    paths:
+      - "webapp/**"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check JS syntax
+        run: |
+          npx eslint webapp/**/*.js || exit 1
+
+      - name: Validate HTML
+        uses: Cyb3r-Jak3/html5validator-action@v2
+        with:
+          path: ./webapp
