@@ -1,0 +1,27 @@
+name: Android CI
+
+on:
+  push:
+    paths:
+      - "android/**"
+  pull_request:
+    paths:
+      - "android/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Build Android App
+        run: |
+          cd android
+          ./gradlew assembleDebug
