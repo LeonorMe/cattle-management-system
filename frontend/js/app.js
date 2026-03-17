@@ -21,8 +21,17 @@ async function api(method, path, body = null, auth_token = null) {
   });
 
   if (res.status === 204) return null;
+
+  // Guard: only parse JSON if the response is actually JSON
+  const contentType = res.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Server error (${res.status})`);
+    return text;
+  }
+
   const data = await res.json();
-  if (!res.ok) throw new Error(data.detail ?? 'Request failed');
+  if (!res.ok) throw new Error(data.detail ?? `Server error (${res.status})`);
   return data;
 }
 
@@ -154,8 +163,11 @@ document.querySelectorAll('.toggle-password').forEach(btn => {
 async function initApp() {
   showPage('page-loading');
   try {
-    const [userRes, farmRes, animalsRes] = await Promise.allSettled([
-      api('GET', '/auth/register').catch(() => null), // placeholder — use /users/me later
+    // Load user profile first — if token is invalid this will throw
+    state.user = await api('GET', '/users/me');
+
+    // Load farm + animals in parallel; gracefully handle 404 (no farm yet)
+    const [farmRes, animalsRes] = await Promise.allSettled([
       api('GET', '/farms/me'),
       api('GET', '/animals/'),
     ]);
@@ -163,13 +175,20 @@ async function initApp() {
     if (farmRes.status === 'fulfilled' && farmRes.value) {
       state.farm = farmRes.value;
     }
-    if (animalsRes.status === 'fulfilled' && animalsRes.value) {
+    if (animalsRes.status === 'fulfilled' && Array.isArray(animalsRes.value)) {
       state.animals = animalsRes.value;
+    }
+
+    // If user has no farm yet, show the setup page
+    if (!state.farm) {
+      showPage('page-setup-farm');
+      return;
     }
 
     renderDashboard();
     showPage('page-dashboard');
   } catch (err) {
+    // Token expired or invalid — back to splash
     auth.clear();
     showPage('page-splash');
   }
