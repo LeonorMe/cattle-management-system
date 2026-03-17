@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Gestão de bovinos para pequenas quintas — registo de animais, genealogia e notificações.">
+  <title>Cattle Management System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4a6741">
+</head>
+<body>
+
+<div id="toast-container" class="toast-container"></div>
+
+<div class="app-shell">
+
+  <!-- ─────────────── LOADING ─────────────── -->
+  <div id="page-loading" class="page active" style="align-items:center;justify-content:center;min-height:100vh;gap:16px;">
+    <div style="font-size:48px">🐄</div>
+    <div class="spinner" style="border-color:rgba(74,103,65,0.3);border-top-color:var(--color-primary);width:32px;height:32px;border-width:4px;"></div>
+  </div>
+
+  <!-- ─────────────── SPLASH ─────────────── -->
+  <div id="page-splash" class="page" style="flex:1;">
+    <div class="hero-full">
+      <img class="hero-full-img" src="img/hero.jpg" alt="Cattle in field" onerror="this.style.background='#4a6741';this.removeAttribute('src');">
+      <div class="hero-full-overlay"></div>
+      <div class="splash-content">
+        <div class="splash-logo">
+          <div class="splash-logo-icon">🐄</div>
+          <div class="splash-logo-text">Cattle<br>Management<br>System</div>
+        </div>
+        <button class="btn btn-primary" id="btn-go-login">Entrar</button>
+        <button class="btn btn-outline" id="btn-go-register">Criar uma conta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────── LOGIN ─────────────── -->
+  <div id="page-login" class="page">
+    <div class="hero">
+      <img class="hero-img" src="img/hero.jpg" alt="Cattle" onerror="this.style.background='#4a6741';this.removeAttribute('src');">
+      <div class="hero-overlay"></div>
+      <div class="hero-logo">
+        <div class="hero-logo-icon">🐄</div>
+        <div class="hero-logo-text">Cattle<br>Management<br>System</div>
+      </div>
+    </div>
+
+    <div class="content-card">
+      <h1 class="heading-xl mb-sm">Bem-vindo de volta</h1>
+      <p class="subtext mb-xl">Entre na sua conta</p>
+
+      <form id="form-login" novalidate>
+        <div class="form-group">
+          <div class="input-wrapper">
+            <span class="input-icon">👤</span>
+            <input type="email" id="login-email" placeholder="Nome ou email" autocomplete="email" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="login-password" placeholder="Palavra passe" autocomplete="current-password" required>
+            <button type="button" class="input-toggle toggle-password" aria-label="Mostrar senha">👁️</button>
+          </div>
+        </div>
+
+        <p id="login-error" class="error-msg mt-md"></p>
+
+        <div class="mt-xl">
+          <button class="btn btn-primary" id="btn-login" type="submit">Entrar</button>
+        </div>
+      </form>
+
+      <p class="text-center mt-lg" style="font-size:14px;color:var(--color-text-secondary)">
+        Não têm uma conta? <a href="#" class="link" id="link-go-register">Registe-se</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- ─────────────── REGISTER ─────────────── -->
+  <div id="page-register" class="page">
+    <div class="app-bar">
+      <button class="btn btn-icon btn-ghost" id="btn-back-register" style="width:40px;height:40px;font-size:20px;" onclick="showPage('page-splash')">←</button>
+      <span class="app-bar-title">Criar conta</span>
+      <div style="width:40px;"></div>
+    </div>
+
+    <div class="scrollable" style="padding-top:var(--space-lg)">
+      <p class="subtext mb-xl">Preencha os seus dados para começar</p>
+
+      <form id="form-register" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="reg-name">Nome completo</label>
+          <div class="input-wrapper">
+            <span class="input-icon">👤</span>
+            <input type="text" id="reg-name" placeholder="O seu nome" autocomplete="name" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-email">Email</label>
+          <div class="input-wrapper">
+            <span class="input-icon">✉️</span>
+            <input type="email" id="reg-email" placeholder="email@exemplo.com" autocomplete="email" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="reg-password">Palavra-passe</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="reg-password" placeholder="Mínimo 8 caracteres" autocomplete="new-password" required minlength="8">
+            <button type="button" class="input-toggle toggle-password" aria-label="Mostrar senha">👁️</button>
+          </div>
+        </div>
+
+        <p id="reg-error" class="error-msg mt-md"></p>
+
+        <div class="mt-xl">
+          <button class="btn btn-primary" id="btn-register" type="submit">Criar conta</button>
+        </div>
+      </form>
+
+      <p class="text-center mt-lg" style="font-size:14px;color:var(--color-text-secondary)">
+        Já tem conta? <a href="#" class="link" id="link-go-login">Entrar</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- ─────────────── SETUP FARM ─────────────── -->
+  <div id="page-setup-farm" class="page">
+    <div class="content-card" style="flex:1;display:flex;flex-direction:column;padding-top:var(--space-xl);">
+      <h1 class="heading-lg mb-sm">Configurar a sua quinta</h1>
+      <p class="subtext mb-xl">Crie ou junte-se a uma quinta para começar a gerir os seus animais.</p>
+
+      <form id="form-create-farm" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="farm-name-input">Nome da quinta</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🏡</span>
+            <input type="text" id="farm-name-input" placeholder="Ex: Quinta do Vale Verde" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="farm-location">Localização (opcional)</label>
+          <div class="input-wrapper">
+            <span class="input-icon">📍</span>
+            <input type="text" id="farm-location" placeholder="Ex: Mirandela, Portugal">
+          </div>
+        </div>
+        <p id="farm-error" class="error-msg mt-md"></p>
+        <div class="mt-lg">
+          <button class="btn btn-primary" id="btn-create-farm" type="submit">Criar quinta</button>
+        </div>
+      </form>
+
+      <div class="divider">ou</div>
+
+      <div class="form-group">
+        <label class="form-label" for="join-farm-id">Código/ID da quinta existente</label>
+        <div class="input-wrapper">
+          <span class="input-icon">🔑</span>
+          <input type="text" id="join-farm-id" placeholder="Cole o ID aqui">
+        </div>
+      </div>
+      <button class="btn btn-ghost mt-md" id="btn-join-farm">Juntar-se à quinta</button>
+    </div>
+  </div>
+
+  <!-- ─────────────── DASHBOARD ─────────────── -->
+  <div id="page-dashboard" class="page">
+    <div class="app-bar">
+      <div style="flex:1">
+        <div style="font-size:12px;color:var(--color-text-muted)">Quinta</div>
+        <div style="font-size:15px;font-weight:700;" id="farm-name">—</div>
+      </div>
+      <button class="btn btn-icon btn-ghost" onclick="showPage('page-setup-farm')" title="Quinta" style="font-size:20px;">🏡</button>
+    </div>
+
+    <div class="scrollable">
+      <h2 class="heading-md mb-md">Visão geral</h2>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-total">—</div>
+          <div class="stat-label">Total de animais</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-active">—</div>
+          <div class="stat-label">Ativos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-female">—</div>
+          <div class="stat-label">Fêmeas 🐄</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-male">—</div>
+          <div class="stat-label">Machos 🐂</div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <h2 class="heading-md">Animais recentes</h2>
+        <button class="btn btn-sm btn-ghost" style="width:auto" data-page="page-animals" onclick="document.querySelector('[data-page=page-animals]').click()">Ver todos</button>
+      </div>
+
+      <div id="animal-list"></div>
+    </div>
+
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-page="page-dashboard">
+        <span>🏠</span><span>Início</span>
+      </button>
+      <button class="nav-item" data-page="page-animals">
+        <span>🐄</span><span>Animais</span>
+      </button>
+      <button class="nav-item" data-page="page-add-animal">
+        <span>➕</span><span>Adicionar</span>
+      </button>
+      <button class="nav-item" data-page="page-settings">
+        <span>⚙️</span><span>Definições</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ─────────────── ALL ANIMALS ─────────────── -->
+  <div id="page-animals" class="page">
+    <div class="app-bar">
+      <div class="app-bar-title">Animais</div>
+    </div>
+
+    <div class="scrollable">
+      <div id="animal-list-full"></div>
+    </div>
+
+    <nav class="bottom-nav">
+      <button class="nav-item" data-page="page-dashboard"><span>🏠</span><span>Início</span></button>
+      <button class="nav-item active" data-page="page-animals"><span>🐄</span><span>Animais</span></button>
+      <button class="nav-item" data-page="page-add-animal"><span>➕</span><span>Adicionar</span></button>
+      <button class="nav-item" data-page="page-settings"><span>⚙️</span><span>Definições</span></button>
+    </nav>
+  </div>
+
+  <!-- ─────────────── ADD ANIMAL ─────────────── -->
+  <div id="page-add-animal" class="page">
+    <div class="app-bar">
+      <button class="btn btn-icon btn-ghost" onclick="showPage('page-dashboard')" style="font-size:20px;">←</button>
+      <span class="app-bar-title">Adicionar animal</span>
+      <div style="width:40px;"></div>
+    </div>
+
+    <div class="scrollable">
+      <form id="form-add-animal" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="a-reg-id">Nº de identificação *</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🏷️</span>
+            <input type="text" id="a-reg-id" placeholder="Ex: PT123456789" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="a-name">Nome</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🐄</span>
+            <input type="text" id="a-name" placeholder="Nome do animal (opcional)">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="a-breed">Raça</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🧬</span>
+            <input type="text" id="a-breed" placeholder="Ex: Angus, Mertolenga...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="a-gender">Sexo *</label>
+          <select class="form-input" id="a-gender" required>
+            <option value="">Selecionar...</option>
+            <option value="F">Fêmea 🐄</option>
+            <option value="M">Macho 🐂</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="a-birth">Data de nascimento</label>
+          <input class="form-input" type="date" id="a-birth">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="a-status">Estado</label>
+          <select class="form-input" id="a-status">
+            <option value="Active">Ativo</option>
+            <option value="Sold">Vendido</option>
+            <option value="Deceased">Falecido</option>
+          </select>
+        </div>
+
+        <p id="add-animal-error" class="error-msg mt-md"></p>
+
+        <div class="mt-xl">
+          <button class="btn btn-primary" id="btn-add-animal" type="submit">Guardar animal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─────────────── SETTINGS ─────────────── -->
+  <div id="page-settings" class="page">
+    <div class="app-bar">
+      <div class="app-bar-title">Definições</div>
+    </div>
+    <div class="scrollable">
+      <div style="padding:var(--space-md) 0;border-bottom:1px solid var(--color-border);display:flex;align-items:center;gap:var(--space-md)">
+        <span style="font-size:28px">🏡</span>
+        <div>
+          <div style="font-weight:600;font-size:15px" id="settings-farm-name">—</div>
+          <div class="subtext" id="settings-farm-location">Sem localização definida</div>
+        </div>
+      </div>
+
+      <div class="mt-xl">
+        <button class="btn btn-ghost" id="btn-logout" style="color:var(--color-danger);border-color:var(--color-danger)">
+          Terminar sessão
+        </button>
+      </div>
+    </div>
+
+    <nav class="bottom-nav">
+      <button class="nav-item" data-page="page-dashboard"><span>🏠</span><span>Início</span></button>
+      <button class="nav-item" data-page="page-animals"><span>🐄</span><span>Animais</span></button>
+      <button class="nav-item" data-page="page-add-animal"><span>➕</span><span>Adicionar</span></button>
+      <button class="nav-item active" data-page="page-settings"><span>⚙️</span><span>Definições</span></button>
+    </nav>
+  </div>
+
+</div><!-- .app-shell -->
+
+<script src="js/app.js"></script>
+</body>
+</html>

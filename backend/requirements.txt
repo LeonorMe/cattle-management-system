@@ -1,7 +1,11 @@
 fastapi
 uvicorn[standard]
-pydantic
+pydantic[email]
+pydantic-settings
 sqlalchemy
 alembic
 python-dotenv
-psycopg2-binary
+# psycopg2-binary  # uncomment for PostgreSQL production
+python-multipart
+passlib[bcrypt]
+python-jose[cryptography]
