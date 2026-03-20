@@ -82,6 +82,7 @@ const state = {
   user: null,
   farm: null,
   animals: [],
+  events: [],
 };
 
 // ── On Load ───────────────────────────────────────
@@ -179,6 +180,9 @@ async function initApp() {
       state.animals = animalsRes.value;
     }
 
+    const eventsRes = await api('GET', '/events/');
+    state.events = Array.isArray(eventsRes) ? eventsRes : [];
+
     // If user has no farm yet, show the setup page
     if (!state.farm) {
       showPage('page-setup-farm');
@@ -206,10 +210,34 @@ function renderDashboard() {
   document.getElementById('stat-female').textContent  = female;
   document.getElementById('stat-male').textContent    = male;
 
-  const farmName = document.getElementById('farm-name');
-  if (farmName && state.farm) farmName.textContent = state.farm.name;
+  const farmNameEl = document.getElementById('farm-name');
+  if (farmNameEl && state.farm) farmNameEl.textContent = state.farm.name;
 
-  renderAnimalList(state.animals);
+  renderAnimalList(state.animals.slice(0, 5)); // Just top 5 on dashboard
+  renderEventList(state.events.slice(0, 5));
+}
+
+function renderEventList(events) {
+  const list = document.getElementById('event-list');
+  if (!list) return;
+
+  if (events.length === 0) {
+    list.innerHTML = `<p class="subtext text-center" style="padding:var(--space-md) 0">Nenhum evento recente.</p>`;
+    return;
+  }
+
+  list.innerHTML = events.map(e => {
+    const animal = state.animals.find(a => a.id === e.animal_id);
+    return `
+      <div class="event-row">
+        <div class="event-dot"></div>
+        <div class="event-info">
+          <div class="event-title">${e.event_type} — ${animal?.name ?? animal?.registration_id ?? 'Animal'}</div>
+          <div class="event-date">${new Date(e.date).toLocaleDateString('pt-PT')}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderAnimalList(animals) {
@@ -262,6 +290,11 @@ document.querySelectorAll('.nav-item').forEach(item => {
   });
 });
 
+document.querySelector('[data-page="page-animals"]')?.addEventListener('click', () => {
+  renderAnimalList(state.animals);
+  showPage('page-animals');
+});
+
 // ── Add Animal Form ───────────────────────────────
 document.getElementById('form-add-animal')?.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -293,11 +326,150 @@ document.getElementById('form-add-animal')?.addEventListener('submit', async (e)
   }
 });
 
-// ── Animal Detail (placeholder) ───────────────────
-function showAnimalDetail(id) {
+// ── Animal Detail ─────────────────────────────────
+async function showAnimalDetail(id) {
   const animal = state.animals.find(a => a.id === id);
   if (!animal) return;
-  showToast(`${animal.name ?? animal.registration_id} — Em breve!`, 'info');
+
+  document.getElementById('d-name').textContent = animal.name ?? 'Sem nome';
+  document.getElementById('d-reg-id').textContent = `# ${animal.registration_id}`;
+  document.getElementById('d-status').textContent = translateStatus(animal.status);
+  document.getElementById('d-gender').textContent = animal.gender === 'F' ? 'Fêmea 🐄' : 'Macho 🐂';
+  document.getElementById('d-breed').textContent = animal.breed ?? '—';
+  document.getElementById('d-birth').textContent = animal.birth_date ? new Date(animal.birth_date).toLocaleDateString('pt-PT') : '—';
+  document.getElementById('d-avatar').textContent = animal.gender === 'F' ? '🐄' : '🐂';
+
+  // Events for this animal
+  const animalEvents = state.events
+    .filter(e => e.animal_id === id)
+    .sort((a, b) => new Date(b.event_date) - new Date(a.event_date));
+
+  const eventList = document.getElementById('detail-event-list');
+  if (eventList) {
+    if (animalEvents.length === 0) {
+      eventList.innerHTML = `<p class="subtext text-center">Nenhum evento registado.</p>`;
+    } else {
+      eventList.innerHTML = animalEvents.map(e => `
+        <div class="event-row">
+          <div class="event-dot"></div>
+          <div class="event-info">
+            <div class="event-title">${translateEventType(e.event_type)}</div>
+            <div class="event-date">${new Date(e.event_date).toLocaleDateString('pt-PT')}</div>
+            ${e.description ? `<div class="subtext" style="font-size:12px; margin-top:2px">${e.description}</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Set up action buttons
+  document.getElementById('btn-edit-animal-trigger').onclick = () => showEditAnimal(animal);
+  document.getElementById('btn-delete-animal').onclick = () => handleDeleteAnimal(animal);
+  document.getElementById('btn-log-event').onclick = () => {
+    document.getElementById('event-animal-id').value = id;
+    document.getElementById('ev-date').value = new Date().toISOString().split('T')[0];
+    showPage('page-add-event');
+  };
+
+  showPage('page-animal-detail');
+}
+
+function translateEventType(type) {
+  const map = {
+    Vaccination: 'Vacinação 💉',
+    Medication:  'Medicação 💊',
+    Heat:        'Cio 🔥',
+    Pregnancy:   'Prenhez 🤰',
+    Birth:       'Nascimento 🐣',
+    Other:       'Outro'
+  };
+  return map[type] ?? type;
+}
+
+document.getElementById('form-add-event')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const animal_id = document.getElementById('event-animal-id').value;
+  const btn       = document.getElementById('btn-save-event');
+  const errEl     = document.getElementById('add-event-error');
+
+  errEl.classList.remove('visible');
+  setButtonLoading(btn, true);
+
+  const payload = {
+    animal_id,
+    event_type:  document.getElementById('ev-type').value,
+    event_date:  document.getElementById('ev-date').value,
+    description: document.getElementById('ev-desc').value.trim() || null,
+  };
+
+  try {
+    const newEvent = await api('POST', '/events/', payload);
+    state.events.unshift(newEvent);
+    showToast('Evento registado!', 'success');
+    showAnimalDetail(animal_id);
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.add('visible');
+  } finally {
+    setButtonLoading(btn, false);
+  }
+});
+
+function showEditAnimal(animal) {
+  document.getElementById('e-id').value = animal.id;
+  document.getElementById('e-reg-id').value = animal.registration_id;
+  document.getElementById('e-name').value = animal.name ?? '';
+  document.getElementById('e-breed').value = animal.breed ?? '';
+  document.getElementById('e-birth').value = animal.birth_date ?? '';
+  document.getElementById('e-status').value = animal.status;
+
+  showPage('page-edit-animal');
+}
+
+document.getElementById('form-edit-animal')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id    = document.getElementById('e-id').value;
+  const btn   = document.getElementById('btn-update-animal');
+  const errEl = document.getElementById('edit-animal-error');
+
+  errEl.classList.remove('visible');
+  setButtonLoading(btn, true);
+
+  const payload = {
+    name:       document.getElementById('e-name').value.trim() || null,
+    breed:      document.getElementById('e-breed').value.trim() || null,
+    birth_date: document.getElementById('e-birth').value || null,
+    status:     document.getElementById('e-status').value,
+  };
+
+  try {
+    const updated = await api('PATCH', `/animals/${id}`, payload);
+    // Update local state
+    const index = state.animals.findIndex(a => a.id === id);
+    if (index !== -1) state.animals[index] = updated;
+
+    showToast('Animal atualizado!', 'success');
+    showAnimalDetail(id);
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.add('visible');
+  } finally {
+    setButtonLoading(btn, false);
+  }
+});
+
+async function handleDeleteAnimal(animal) {
+  if (!confirm(`Tem a certeza que deseja eliminar ${animal.name ?? animal.registration_id}?`)) return;
+
+  try {
+    await api('DELETE', `/animals/${animal.id}`);
+    state.animals = state.animals.filter(a => a.id !== animal.id);
+    showToast('Animal eliminado.', 'success');
+    showPage('page-animals');
+    renderAnimalList(state.animals);
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
 }
 
 // ── Setup Farm Page ───────────────────────────────

@@ -207,10 +207,14 @@
 
       <div class="section-header">
         <h2 class="heading-md">Animais recentes</h2>
-        <button class="btn btn-sm btn-ghost" style="width:auto" data-page="page-animals" onclick="document.querySelector('[data-page=page-animals]').click()">Ver todos</button>
+        <button class="btn btn-sm btn-ghost" style="width:auto" data-page="page-animals">Ver todos</button>
       </div>
+      <div id="animal-list" class="mb-lg"></div>
 
-      <div id="animal-list"></div>
+      <div class="section-header">
+        <h2 class="heading-md">Eventos recentes</h2>
+      </div>
+      <div id="event-list"></div>
     </div>
 
     <nav class="bottom-nav">
@@ -245,6 +249,163 @@
       <button class="nav-item" data-page="page-add-animal"><span>➕</span><span>Adicionar</span></button>
       <button class="nav-item" data-page="page-settings"><span>⚙️</span><span>Definições</span></button>
     </nav>
+  </div>
+
+  <!-- ─────────────── ANIMAL DETAIL ─────────────── -->
+  <div id="page-animal-detail" class="page">
+    <div class="app-bar">
+      <button class="btn btn-icon btn-ghost" onclick="showPage('page-animals')" style="font-size:20px;">←</button>
+      <span class="app-bar-title">Detalhes do animal</span>
+      <button class="btn btn-icon btn-ghost" id="btn-edit-animal-trigger" style="font-size:20px;">✏️</button>
+    </div>
+    <div class="scrollable">
+      <div class="detail-header">
+        <div class="detail-avatar" id="d-avatar">🐄</div>
+        <h1 class="heading-lg" id="d-name">—</h1>
+        <p class="subtext" id="d-reg-id"># —</p>
+      </div>
+
+      <div class="stats-grid mt-md">
+        <div class="stat-card">
+          <div class="stat-label">Estado</div>
+          <div class="stat-value-sm" id="d-status">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Sexo</div>
+          <div class="stat-value-sm" id="d-gender">—</div>
+        </div>
+      </div>
+
+      <div class="info-list mt-lg">
+        <div class="info-item">
+          <span class="info-label">Raça</span>
+          <span class="info-value" id="d-breed">—</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Nascimento</span>
+          <span class="info-value" id="d-birth">—</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Mãe</span>
+          <span class="info-value" id="d-mother">—</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Pai</span>
+          <span class="info-value" id="d-father">—</span>
+        </div>
+      </div>
+
+      <div class="mt-xl" style="display:grid; grid-template-columns: 1fr 1fr; gap:var(--space-md)">
+        <button class="btn btn-primary" id="btn-log-event">Registar evento</button>
+        <button class="btn btn-outline-danger" id="btn-delete-animal">Eliminar</button>
+      </div>
+
+      <div class="section-header mt-xl">
+        <h2 class="heading-md">Histórico de eventos</h2>
+      </div>
+      <div id="detail-event-list" class="mt-md"></div>
+    </div>
+  </div>
+
+  <!-- ─────────────── ADD EVENT ─────────────── -->
+  <div id="page-add-event" class="page">
+    <div class="app-bar">
+      <button class="btn btn-icon btn-ghost" onclick="showPage('page-animal-detail')" style="font-size:20px;">←</button>
+      <span class="app-bar-title">Registar evento</span>
+      <div style="width:40px;"></div>
+    </div>
+    <div class="scrollable">
+      <form id="form-add-event" novalidate>
+        <input type="hidden" id="event-animal-id">
+        
+        <div class="form-group">
+          <label class="form-label" for="ev-type">Tipo de evento *</label>
+          <select class="form-input" id="ev-type" required>
+            <option value="">Selecionar...</option>
+            <option value="Vaccination">Vacinação 💉</option>
+            <option value="Medication">Medicação 💊</option>
+            <option value="Heat">Cio 🔥</option>
+            <option value="Pregnancy">Confirmar Prenhez 🤰</option>
+            <option value="Birth">Nascimento 🐣</option>
+            <option value="Other">Outro...</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ev-date">Data *</label>
+          <input class="form-input" type="date" id="ev-date" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ev-desc">Notas / Descrição</label>
+          <textarea class="form-input" id="ev-desc" rows="3" placeholder="Detalhes do evento..."></textarea>
+        </div>
+
+        <p id="add-event-error" class="error-msg mt-md"></p>
+
+        <div class="mt-xl">
+          <button class="btn btn-primary" id="btn-save-event" type="submit">Guardar evento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ─────────────── EDIT ANIMAL ─────────────── -->
+  <div id="page-edit-animal" class="page">
+    <div class="app-bar">
+      <button class="btn btn-icon btn-ghost" onclick="showPage('page-animal-detail')" style="font-size:20px;">←</button>
+      <span class="app-bar-title">Editar animal</span>
+      <div style="width:40px;"></div>
+    </div>
+
+    <div class="scrollable">
+      <form id="form-edit-animal" novalidate>
+        <input type="hidden" id="e-id">
+        <div class="form-group">
+          <label class="form-label" for="e-reg-id">Nº de identificação</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🏷️</span>
+            <input type="text" id="e-reg-id" readonly style="background:var(--color-bg-alt); opacity:0.7">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="e-name">Nome</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🐄</span>
+            <input type="text" id="e-name" placeholder="Nome do animal">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="e-breed">Raça</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🧬</span>
+            <input type="text" id="e-breed" placeholder="Ex: Angus, Mertolenga...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="e-birth">Data de nascimento</label>
+          <input class="form-input" type="date" id="e-birth">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="e-status">Estado</label>
+          <select class="form-input" id="e-status">
+            <option value="Active">Ativo</option>
+            <option value="Sold">Vendido</option>
+            <option value="Deceased">Falecido</option>
+          </select>
+        </div>
+
+        <p id="edit-animal-error" class="error-msg mt-md"></p>
+
+        <div class="mt-xl">
+          <button class="btn btn-primary" id="btn-update-animal" type="submit">Atualizar animal</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- ─────────────── ADD ANIMAL ─────────────── -->
