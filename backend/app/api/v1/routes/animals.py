@@ -91,3 +91,30 @@ def delete_animal(
     animal = _get_farm_animal(animal_id, db, current_user.farm_id)
     db.delete(animal)
     db.commit()
+
+@router.get("/{animal_id}/genealogy", response_model=Any)
+def get_animal_genealogy(
+    animal_id: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Get parents and children of an animal."""
+    animal = _get_farm_animal(animal_id, db, current_user.farm_id)
+    
+    # We already have relationships `mother` and `father` defined on the model
+    # and backrefs `children_as_mother` and `children_as_father`.
+    mother = animal.mother
+    father = animal.father
+    
+    children = []
+    if animal.gender.value == 'F':
+        children = animal.children_as_mother
+    else:
+        children = animal.children_as_father
+        
+    from app.schemas.animal import GenealogyOut
+    return GenealogyOut(
+        mother=mother,
+        father=father,
+        children=children
+    )

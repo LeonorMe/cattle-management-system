@@ -30,3 +30,11 @@ class AnimalOut(AnimalBase):
 
     class Config:
         from_attributes = True
+
+class GenealogyOut(BaseModel):
+    mother: Optional[AnimalOut] = None
+    father: Optional[AnimalOut] = None
+    children: list[AnimalOut] = []
+
+    class Config:
+        from_attributes = True

@@ -283,6 +283,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
       renderAnimalList(state.animals);
       showPage('page-animals');
     } else if (target === 'page-add-animal') {
+      populateParentDropdowns('a-mother', 'a-father');
       showPage('page-add-animal');
     } else if (target === 'page-settings') {
       showPage('page-settings');
@@ -310,6 +311,8 @@ document.getElementById('form-add-animal')?.addEventListener('submit', async (e)
     gender:          document.getElementById('a-gender').value,
     birth_date:      document.getElementById('a-birth').value || null,
     status:          document.getElementById('a-status').value,
+    mother_id:       document.getElementById('a-mother').value || null,
+    father_id:       document.getElementById('a-father').value || null,
   };
 
   try {
@@ -371,6 +374,8 @@ async function showAnimalDetail(id) {
     showPage('page-add-event');
   };
 
+  loadGenealogy(id);
+
   showPage('page-animal-detail');
 }
 
@@ -416,12 +421,16 @@ document.getElementById('form-add-event')?.addEventListener('submit', async (e) 
 });
 
 function showEditAnimal(animal) {
+  populateParentDropdowns('e-mother', 'e-father', animal.id);
+
   document.getElementById('e-id').value = animal.id;
   document.getElementById('e-reg-id').value = animal.registration_id;
   document.getElementById('e-name').value = animal.name ?? '';
   document.getElementById('e-breed').value = animal.breed ?? '';
   document.getElementById('e-birth').value = animal.birth_date ?? '';
   document.getElementById('e-status').value = animal.status;
+  document.getElementById('e-mother').value = animal.mother_id ?? '';
+  document.getElementById('e-father').value = animal.father_id ?? '';
 
   showPage('page-edit-animal');
 }
@@ -440,6 +449,8 @@ document.getElementById('form-edit-animal')?.addEventListener('submit', async (e
     breed:      document.getElementById('e-breed').value.trim() || null,
     birth_date: document.getElementById('e-birth').value || null,
     status:     document.getElementById('e-status').value,
+    mother_id:  document.getElementById('e-mother').value || null,
+    father_id:  document.getElementById('e-father').value || null,
   };
 
   try {
@@ -522,3 +533,88 @@ document.getElementById('btn-logout')?.addEventListener('click', () => {
   showPage('page-splash');
   showToast('Sessão terminada.', 'info');
 });
+
+// ── Genealogy logic ───────────────────────────────
+function populateParentDropdowns(selectMotherId, selectFatherId, currentAnimalId = null) {
+  const motherSelect = document.getElementById(selectMotherId);
+  const fatherSelect = document.getElementById(selectFatherId);
+  if (!motherSelect || !fatherSelect) return;
+
+  motherSelect.innerHTML = '<option value="">Desconhecida / Nenhuma</option>';
+  fatherSelect.innerHTML = '<option value="">Desconhecido / Nenhum</option>';
+
+  const sortedAnimals = [...state.animals].sort((a,b) => (a.name||a.registration_id).localeCompare(b.name||b.registration_id));
+  
+  for (const a of sortedAnimals) {
+    if (a.id === currentAnimalId) continue;
+    const label = a.name ? `${a.name} (#${a.registration_id})` : `#${a.registration_id}`;
+    if (a.gender === 'F') {
+      motherSelect.innerHTML += `<option value="${a.id}">${label}</option>`;
+    } else if (a.gender === 'M') {
+      fatherSelect.innerHTML += `<option value="${a.id}">${label}</option>`;
+    }
+  }
+}
+
+async function loadGenealogy(animalId) {
+  const container = document.getElementById('detail-genealogy-list');
+  if (!container) return;
+  container.innerHTML = '<div class="text-center" style="padding:var(--space-md); color:var(--color-text-muted)">A carregar...</div>';
+  
+  try {
+    const data = await api('GET', `/animals/${animalId}/genealogy`);
+    let html = '';
+    
+    // Parents
+    html += '<div class="mb-md"><strong style="display:block;margin-bottom:8px;color:var(--color-text-muted);font-size:12px;text-transform:uppercase;">Progenitores</strong><div style="display:flex;flex-direction:column;gap:8px;">';
+    
+    if (data.mother) {
+      html += `<div class="animal-card" style="cursor:pointer" onclick="showAnimalDetail('${data.mother.id}')">
+        <div class="animal-avatar">🐄</div>
+        <div class="animal-info">
+          <div class="animal-name">${data.mother.name ?? 'Sem nome'} <span style="font-size:12px;color:var(--color-text-muted);font-weight:normal">(Mãe)</span></div>
+          <div class="animal-tag"># ${data.mother.registration_id}</div>
+        </div>
+      </div>`;
+    } else {
+      html += '<div class="subtext">Mãe desconhecida</div>';
+    }
+    
+    html += '<div style="height:4px"></div>';
+    
+    if (data.father) {
+      html += `<div class="animal-card" style="cursor:pointer" onclick="showAnimalDetail('${data.father.id}')">
+        <div class="animal-avatar">🐂</div>
+        <div class="animal-info">
+          <div class="animal-name">${data.father.name ?? 'Sem nome'} <span style="font-size:12px;color:var(--color-text-muted);font-weight:normal">(Pai)</span></div>
+          <div class="animal-tag"># ${data.father.registration_id}</div>
+        </div>
+      </div>`;
+    } else {
+      html += '<div class="subtext">Pai desconhecido</div>';
+    }
+    html += '</div></div>';
+    
+    // Children
+    html += '<div><strong style="display:block;margin-bottom:8px;color:var(--color-text-muted);font-size:12px;text-transform:uppercase;">Descendentes</strong><div style="display:flex;flex-direction:column;gap:8px;">';
+    if (!data.children || data.children.length === 0) {
+      html += '<div class="subtext">Sem descendentes registados</div>';
+    } else {
+      html += data.children.map(c => `
+        <div class="animal-card" style="cursor:pointer" onclick="showAnimalDetail('${c.id}')">
+          <div class="animal-avatar">${c.gender === 'F' ? '🐄' : '🐂'}</div>
+          <div class="animal-info">
+            <div class="animal-name">${c.name ?? 'Sem nome'}</div>
+            <div class="animal-tag"># ${c.registration_id}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+    html += '</div></div>';
+    
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = `<div class="text-center" style="color:var(--color-danger);padding:var(--space-md)">Erro ao carregar genealogia.</div>`;
+  }
+}
+
