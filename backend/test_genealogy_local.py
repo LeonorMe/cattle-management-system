@@ -30,11 +30,17 @@ def request(method, path, data=None, headers=None):
 
 print("1. Logging in...")
 status, resp = request('POST', '/auth/access-token', "username=test_user@example.com&password=password123")
+print("Login status:", status, resp)
 if status != 200:
-    request('POST', '/auth/register', {"email":"test_user@example.com","name":"Test","password":"password123"})
+    s2, r2 = request('POST', '/auth/register', {"email":"test_user@example.com","name":"Test","password":"password123"})
+    print("Register status:", s2, r2)
     status, resp = request('POST', '/auth/access-token', "username=test_user@example.com&password=password123")
+    print("Login 2 status:", status, resp)
 
-token = resp["access_token"]
+token = resp.get("access_token")
+if not token:
+    print("Failed to get token!")
+    exit(1)
 headers = {"Authorization": f"Bearer {token}"}
 
 print("2. Checking farm...")
