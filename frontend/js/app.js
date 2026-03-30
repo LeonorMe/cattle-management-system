@@ -214,6 +214,42 @@ function renderDashboard() {
   document.getElementById('stat-female').textContent  = female;
   document.getElementById('stat-male').textContent    = male;
 
+  // ── Advanced Productivity Stats ──
+  const currentYear = new Date().getFullYear();
+  
+  const birthsThisYear = state.events.filter(e => {
+    if (e.event_type !== 'Birth') return false;
+    const evYear = new Date(e.event_date).getFullYear();
+    return evYear === currentYear;
+  }).length;
+  
+  const sold = state.animals.filter(a => a.status === 'Sold').length;
+  const deceased = state.animals.filter(a => a.status === 'Deceased').length;
+  
+  let pregnantCount = 0;
+  const activeFemales = state.animals.filter(a => a.status === 'Active' && a.gender === 'F');
+  for (const cow of activeFemales) {
+    const cowEvents = state.events
+      .filter(e => e.animal_id === cow.id && (e.event_type === 'Pregnancy' || e.event_type === 'Birth'))
+      .sort((a,b) => new Date(b.event_date) - new Date(a.event_date));
+      
+    if (cowEvents.length > 0 && cowEvents[0].event_type === 'Pregnancy') {
+      pregnantCount++;
+    }
+  }
+
+  const elBirths = document.getElementById('stat-births-yr');
+  if (elBirths) elBirths.textContent = birthsThisYear;
+  
+  const elPregnant = document.getElementById('stat-pregnant');
+  if (elPregnant) elPregnant.textContent = pregnantCount;
+  
+  const elSold = document.getElementById('stat-sold');
+  if (elSold) elSold.textContent = sold;
+  
+  const elDeceased = document.getElementById('stat-deceased');
+  if (elDeceased) elDeceased.textContent = deceased;
+
   const farmNameEl = document.getElementById('farm-name');
   if (farmNameEl && state.farm) farmNameEl.textContent = state.farm.name;
 
