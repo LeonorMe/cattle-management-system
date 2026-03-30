@@ -534,6 +534,71 @@ document.getElementById('btn-logout')?.addEventListener('click', () => {
   showToast('Sessão terminada.', 'info');
 });
 
+// ── Data Management (Export / Import) ─────────────
+document.getElementById('btn-export-excel')?.addEventListener('click', async () => {
+  const token = auth.getToken();
+  if (!token) return;
+  
+  try {
+    const res = await fetch(`${API_BASE}/animals/export/excel?format=xlsx`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail ?? 'Falha ao exportar dados');
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'animais_export.xlsx';
+    a.click();
+    window.URL.revokeObjectURL(url);
+    showToast('Exportação concluída!', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+
+document.getElementById('btn-import-excel')?.addEventListener('click', () => {
+  document.getElementById('import-file-input')?.click();
+});
+
+document.getElementById('import-file-input')?.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = ''; // reset input
+  
+  const btn = document.getElementById('btn-import-excel');
+  setButtonLoading(btn, true);
+  
+  const token = auth.getToken();
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  try {
+    const res = await fetch(`${API_BASE}/animals/import/excel`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.detail ?? 'Falha ao importar dados');
+    
+    showToast(`Importados: ${data.imported}, Atualizados: ${data.updated}`, 'success');
+    
+    // Refresh animals list in state
+    const animalsRes = await api('GET', '/animals/');
+    state.animals = Array.isArray(animalsRes) ? animalsRes : [];
+    renderDashboard();
+    renderAnimalList(state.animals);
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    setButtonLoading(btn, false);
+  }
+});
+
 // ── Genealogy logic ───────────────────────────────
 function populateParentDropdowns(selectMotherId, selectFatherId, currentAnimalId = null) {
   const motherSelect = document.getElementById(selectMotherId);

@@ -524,6 +524,15 @@
       </div>
 
       <div class="mt-xl">
+        <h3 class="heading-sm mb-sm text-muted">Gestão de Dados</h3>
+        <div style="display:flex; gap:var(--space-sm); flex-wrap:wrap">
+          <button class="btn btn-outline" id="btn-export-excel">Exportar (Excel)</button>
+          <button class="btn btn-outline" id="btn-import-excel">Importar (Excel/CSV)</button>
+        </div>
+        <input type="file" id="import-file-input" accept=".xlsx,.csv" style="display:none">
+      </div>
+
+      <div class="mt-xl">
         <button class="btn btn-ghost" id="btn-logout" style="color:var(--color-danger);border-color:var(--color-danger)">
           Terminar sessão
         </button>

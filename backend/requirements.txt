@@ -9,3 +9,4 @@ python-dotenv
 python-multipart
 passlib[bcrypt]
 python-jose[cryptography]
+openpyxl
