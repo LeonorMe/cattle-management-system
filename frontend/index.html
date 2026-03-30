@@ -180,6 +180,10 @@
         <div style="font-size:12px;color:var(--color-text-muted)">Quinta</div>
         <div style="font-size:15px;font-weight:700;" id="farm-name">—</div>
       </div>
+      <button class="btn btn-icon btn-ghost" onclick="renderNotifications(); showPage('page-notifications');" title="Notificações" style="font-size:20px; position:relative; margin-right:4px;">
+        🔔
+        <span id="notif-badge" style="display:none; position:absolute; top:4px; right:4px; width:10px; height:10px; background:var(--color-danger); border-radius:50%; border:2px solid var(--color-bg);"></span>
+      </button>
       <button class="btn btn-icon btn-ghost" onclick="showPage('page-setup-farm')" title="Quinta" style="font-size:20px;">🏡</button>
     </div>
 
@@ -230,6 +234,24 @@
       <button class="nav-item" data-page="page-settings">
         <span>⚙️</span><span>Definições</span>
       </button>
+    </nav>
+  </div>
+
+  <!-- ─────────────── NOTIFICATIONS ─────────────── -->
+  <div id="page-notifications" class="page">
+    <div class="app-bar">
+      <button class="btn btn-icon btn-ghost" onclick="showPage('page-dashboard')" style="font-size:20px;">←</button>
+      <span class="app-bar-title">Notificações</span>
+      <div style="width:40px;"></div>
+    </div>
+    <div class="scrollable">
+      <div id="notifications-list" class="mt-md mb-xl"></div>
+    </div>
+    <nav class="bottom-nav">
+      <button class="nav-item" data-page="page-dashboard"><span>🏠</span><span>Início</span></button>
+      <button class="nav-item" data-page="page-animals"><span>🐄</span><span>Animais</span></button>
+      <button class="nav-item" data-page="page-add-animal"><span>➕</span><span>Adicionar</span></button>
+      <button class="nav-item" data-page="page-settings"><span>⚙️</span><span>Definições</span></button>
     </nav>
   </div>
 

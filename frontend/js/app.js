@@ -83,6 +83,7 @@ const state = {
   farm: null,
   animals: [],
   events: [],
+  notifications: [],
 };
 
 // ── On Load ───────────────────────────────────────
@@ -183,6 +184,9 @@ async function initApp() {
     const eventsRes = await api('GET', '/events/');
     state.events = Array.isArray(eventsRes) ? eventsRes : [];
 
+    const notifRes = await api('GET', '/notifications/');
+    state.notifications = Array.isArray(notifRes) ? notifRes : [];
+
     // If user has no farm yet, show the setup page
     if (!state.farm) {
       showPage('page-setup-farm');
@@ -212,6 +216,11 @@ function renderDashboard() {
 
   const farmNameEl = document.getElementById('farm-name');
   if (farmNameEl && state.farm) farmNameEl.textContent = state.farm.name;
+
+  const badge = document.getElementById('notif-badge');
+  if (badge) {
+    badge.style.display = state.notifications.length > 0 ? 'block' : 'none';
+  }
 
   renderAnimalList(state.animals.slice(0, 5)); // Just top 5 on dashboard
   renderEventList(state.events.slice(0, 5));
@@ -681,5 +690,41 @@ async function loadGenealogy(animalId) {
   } catch (err) {
     container.innerHTML = `<div class="text-center" style="color:var(--color-danger);padding:var(--space-md)">Erro ao carregar genealogia.</div>`;
   }
+}
+
+// ── Notifications render ──────────────────────────
+function renderNotifications() {
+  const list = document.getElementById('notifications-list');
+  if (!list) return;
+
+  if (state.notifications.length === 0) {
+    list.innerHTML = `<div class="text-center" style="padding:var(--space-xl) 0; color:var(--color-text-muted)">
+      <div style="font-size:48px">✅</div>
+      <p class="subtext" style="margin-top:var(--space-sm)">Sem notificações pendentes.</p>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = state.notifications.map(n => {
+    let icon = '📅';
+    if (n.type === 'Birth') icon = '🐣';
+    if (n.type === 'Heat') icon = '🔥';
+    
+    let colorClass = 'var(--color-primary)';
+    if (n.days_until < 0) colorClass = 'var(--color-danger)';
+    else if (n.days_until <= 3) colorClass = '#d97706';
+
+    return `
+      <div class="content-card mb-sm" style="border-left: 4px solid ${colorClass}; cursor:pointer;" onclick="showAnimalDetail('${n.animal_id}')">
+        <div style="display:flex; gap:12px; align-items:flex-start;">
+          <div style="font-size:24px;">${icon}</div>
+          <div style="flex:1;">
+            <div style="font-weight:600; margin-bottom:4px;">${n.title} — ${n.animal_name}</div>
+            <div class="subtext" style="font-size:13px; line-height:1.4;">${n.description}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
