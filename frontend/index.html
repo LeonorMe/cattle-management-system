@@ -10,8 +10,13 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#4a6741">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+
+<div id="offline-indicator" class="offline-banner" style="display:none;">
+    <span>⚠️ Modo Offline — Funcionalidades limitadas</span>
+</div>
 
 <div id="toast-container" class="toast-container"></div>
 
@@ -228,6 +233,21 @@
         <div class="stat-card" style="border-left: 3px solid var(--color-danger)">
           <div class="stat-value" id="stat-deceased">—</div>
           <div class="stat-label" style="font-size:11px">Mortalidade</div>
+        </div>
+      </div>
+
+      <div class="section-header mt-lg mb-sm">
+        <h2 class="heading-md">Gráficos de Desempenho</h2>
+      </div>
+      <div class="content-card mb-lg">
+        <canvas id="chart-births" style="max-height:200px; width:100%"></canvas>
+      </div>
+      <div class="stats-grid mb-lg">
+        <div class="content-card" style="padding:var(--space-md)">
+          <canvas id="chart-status" style="max-height:150px; width:100%"></canvas>
+        </div>
+        <div class="content-card" style="padding:var(--space-md)">
+          <canvas id="chart-breed" style="max-height:150px; width:100%"></canvas>
         </div>
       </div>
 
@@ -577,6 +597,18 @@
       </div>
 
       <div class="mt-xl">
+        <h3 class="heading-sm mb-sm text-muted">Gestão de Equipa</h3>
+        <div id="team-list" class="mb-md">
+            <div class="subtext">A carregar equipa...</div>
+        </div>
+        <div class="input-wrapper mb-sm">
+            <span class="input-icon">🔑</span>
+            <input type="text" id="share-farm-id" readonly style="background:var(--color-bg-alt)">
+        </div>
+        <p class="subtext" style="font-size:12px">Partilhe este ID com os seus trabalhadores para eles se juntarem a esta quinta.</p>
+      </div>
+
+      <div class="mt-xl">
         <button class="btn btn-ghost" id="btn-logout" style="color:var(--color-danger);border-color:var(--color-danger)">
           Terminar sessão
         </button>
@@ -593,6 +625,15 @@
 
 </div><!-- .app-shell -->
 
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(reg => console.log('SW Registered!', reg))
+        .catch(err => console.log('SW Registration Failed!', err));
+    });
+  }
+</script>
 <script src="js/app.js"></script>
 </body>
 </html>

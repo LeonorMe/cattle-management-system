@@ -48,6 +48,128 @@
   --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
+/* ── Offline Banner ── */
+.offline-banner {
+  background: var(--color-warning);
+  color: var(--color-text-primary);
+  text-align: center;
+  padding: var(--space-xs) var(--space-md);
+  font-size: 13px;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.offline-banner span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ── Genealogy Tree ── */
+.genealogy-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: var(--space-md) 0;
+}
+
+.tree-row {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.tree-node {
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 140px;
+  max-width: 45%;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.tree-node:hover:not(.empty) {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+}
+
+.tree-node.empty {
+  opacity: 0.5;
+  cursor: default;
+  background: var(--color-bg);
+}
+
+.tree-node.current-node {
+  border-color: var(--color-primary);
+  background: var(--color-surface-muted);
+  box-shadow: 0 0 0 2px var(--color-primary-light);
+  cursor: default;
+}
+
+.node-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.node-info {
+  min-width: 0;
+}
+
+.node-name {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-label {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.tree-connectors {
+  height: 40px;
+  overflow: visible;
+}
+
+.tree-children {
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.children-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--space-sm);
+}
+
+.child-node {
+  flex-direction: column;
+  padding: var(--space-sm);
+  min-width: 0;
+  text-align: center;
+}
+
+.child-node .node-icon {
+  margin-bottom: 4px;
+}
+
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

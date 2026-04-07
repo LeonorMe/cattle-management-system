@@ -84,10 +84,22 @@ const state = {
   animals: [],
   events: [],
   notifications: [],
+  team: [],
+  isOffline: !navigator.onLine,
 };
+
+// ── Offline status handling ──────────────────────
+window.addEventListener('online',  () => { state.isOffline = false; updateOfflineUI(); });
+window.addEventListener('offline', () => { state.isOffline = true;  updateOfflineUI(); });
+
+function updateOfflineUI() {
+  const banner = document.getElementById('offline-indicator');
+  if (banner) banner.style.display = state.isOffline ? 'block' : 'none';
+}
 
 // ── On Load ───────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  updateOfflineUI();
   if (auth.isLoggedIn()) {
     initApp();
   } else {
@@ -260,6 +272,86 @@ function renderDashboard() {
 
   renderAnimalList(state.animals.slice(0, 5)); // Just top 5 on dashboard
   renderEventList(state.events.slice(0, 5));
+  renderDashboardCharts();
+}
+
+// ── Dashboard Charts ──────────────────────────────
+let charts = {};
+
+function renderDashboardCharts() {
+  if (typeof Chart === 'undefined') return;
+
+  // 1. Births per month (bar chart)
+  const birthsByMonth = new Array(12).fill(0);
+  const currentYear = new Date().getFullYear();
+  state.events.filter(e => e.event_type === 'Birth' && new Date(e.event_date).getFullYear() === currentYear)
+    .forEach(e => {
+        const month = new Date(e.event_date).getMonth();
+        birthsByMonth[month]++;
+    });
+
+  const ctxBirths = document.getElementById('chart-births');
+  if (ctxBirths) {
+    if (charts.births) charts.births.destroy();
+    charts.births = new Chart(ctxBirths, {
+      type: 'bar',
+      data: {
+        labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+        datasets: [{
+          label: 'Nascimentos ' + currentYear,
+          data: birthsByMonth,
+          backgroundColor: 'rgba(74, 103, 65, 0.7)',
+          borderRadius: 4
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+    });
+  }
+
+  // 2. Status distribution (pie)
+  const statusCounts = { Active: 0, Sold: 0, Deceased: 0 };
+  state.animals.forEach(a => statusCounts[a.status]++);
+
+  const ctxStatus = document.getElementById('chart-status');
+  if (ctxStatus) {
+    if (charts.status) charts.status.destroy();
+    charts.status = new Chart(ctxStatus, {
+      type: 'doughnut',
+      data: {
+        labels: ['Ativos', 'Vendidos', 'Falecidos'],
+        datasets: [{
+          data: [statusCounts.Active, statusCounts.Sold, statusCounts.Deceased],
+          backgroundColor: ['#4caf50', '#f5a623', '#d9534f']
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    });
+  }
+
+  // 3. Breed distribution (pie)
+  const breedCounts = {};
+  state.animals.forEach(a => {
+    const b = a.breed || 'Outra';
+    breedCounts[b] = (breedCounts[b] || 0) + 1;
+  });
+  const breedLabels = Object.keys(breedCounts);
+  const breedData = Object.values(breedCounts);
+
+  const ctxBreed = document.getElementById('chart-breed');
+  if (ctxBreed) {
+    if (charts.breed) charts.breed.destroy();
+    charts.breed = new Chart(ctxBreed, {
+      type: 'pie',
+      data: {
+        labels: breedLabels,
+        datasets: [{
+          data: breedData,
+          backgroundColor: ['#4a6741', '#8fae5c', '#d5d9cc', '#7a9e76', '#344d30']
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    });
+  }
 }
 
 function renderEventList(events) {
@@ -331,10 +423,69 @@ document.querySelectorAll('.nav-item').forEach(item => {
       populateParentDropdowns('a-mother', 'a-father');
       showPage('page-add-animal');
     } else if (target === 'page-settings') {
+      renderSettings();
       showPage('page-settings');
     }
   });
 });
+
+async function renderSettings() {
+    const farmNameEl = document.getElementById('settings-farm-name');
+    const farmLocEl  = document.getElementById('settings-farm-location');
+    if (state.farm) {
+        farmNameEl.textContent = state.farm.name;
+        farmLocEl.textContent  = state.farm.location || 'Sem localização definida';
+        
+        const shareIdEl = document.getElementById('share-farm-id');
+        if (shareIdEl) shareIdEl.value = state.farm.id;
+    }
+    
+    // Load team members
+    const teamList = document.getElementById('team-list');
+    if (!teamList) return;
+    
+    try {
+        state.team = await api('GET', '/users/farm-members');
+        renderTeamList();
+    } catch (err) {
+        teamList.innerHTML = `<div class="subtext error-msg visible">Erro ao carregar equipa.</div>`;
+    }
+}
+
+function renderTeamList() {
+    const list = document.getElementById('team-list');
+    if (!list) return;
+
+    if (state.team.length === 0) {
+        list.innerHTML = `<div class="subtext">Apenas você nesta quinta.</div>`;
+        return;
+    }
+
+    list.innerHTML = state.team.map(u => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:var(--space-sm) 0; border-bottom:1px solid var(--color-border)">
+            <div>
+                <div style="font-weight:600; font-size:14px">${u.name}</div>
+                <div class="subtext" style="font-size:12px">${u.email}</div>
+            </div>
+            ${u.id !== state.user.id ? `
+                <button class="btn btn-sm btn-outline-danger" style="padding:4px 8px; font-size:11px" onclick="handleRemoveMember('${u.id}')">Remover</button>
+            ` : '<span class="badge badge-active" style="font-size:9px">Você</span>'}
+        </div>
+    `).join('');
+}
+
+async function handleRemoveMember(userId) {
+    if (!confirm('Tem a certeza que deseja remover este membro da quinta?')) return;
+    
+    try {
+        await api('DELETE', `/users/farm-members/${userId}`);
+        state.team = state.team.filter(u => u.id !== userId);
+        renderTeamList();
+        showToast('Membro removido.', 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
 
 document.querySelector('[data-page="page-animals"]')?.addEventListener('click', () => {
   renderAnimalList(state.animals);
@@ -673,54 +824,70 @@ async function loadGenealogy(animalId) {
   
   try {
     const data = await api('GET', `/animals/${animalId}/genealogy`);
-    let html = '';
+    const current = state.animals.find(a => a.id === animalId);
     
-    // Parents
-    html += '<div class="mb-md"><strong style="display:block;margin-bottom:8px;color:var(--color-text-muted);font-size:12px;text-transform:uppercase;">Progenitores</strong><div style="display:flex;flex-direction:column;gap:8px;">';
-    
-    if (data.mother) {
-      html += `<div class="animal-card" style="cursor:pointer" onclick="showAnimalDetail('${data.mother.id}')">
-        <div class="animal-avatar">🐄</div>
-        <div class="animal-info">
-          <div class="animal-name">${data.mother.name ?? 'Sem nome'} <span style="font-size:12px;color:var(--color-text-muted);font-weight:normal">(Mãe)</span></div>
-          <div class="animal-tag"># ${data.mother.registration_id}</div>
-        </div>
-      </div>`;
-    } else {
-      html += '<div class="subtext">Mãe desconhecida</div>';
-    }
-    
-    html += '<div style="height:4px"></div>';
-    
-    if (data.father) {
-      html += `<div class="animal-card" style="cursor:pointer" onclick="showAnimalDetail('${data.father.id}')">
-        <div class="animal-avatar">🐂</div>
-        <div class="animal-info">
-          <div class="animal-name">${data.father.name ?? 'Sem nome'} <span style="font-size:12px;color:var(--color-text-muted);font-weight:normal">(Pai)</span></div>
-          <div class="animal-tag"># ${data.father.registration_id}</div>
-        </div>
-      </div>`;
-    } else {
-      html += '<div class="subtext">Pai desconhecido</div>';
-    }
-    html += '</div></div>';
-    
-    // Children
-    html += '<div><strong style="display:block;margin-bottom:8px;color:var(--color-text-muted);font-size:12px;text-transform:uppercase;">Descendentes</strong><div style="display:flex;flex-direction:column;gap:8px;">';
-    if (!data.children || data.children.length === 0) {
-      html += '<div class="subtext">Sem descendentes registados</div>';
-    } else {
-      html += data.children.map(c => `
-        <div class="animal-card" style="cursor:pointer" onclick="showAnimalDetail('${c.id}')">
-          <div class="animal-avatar">${c.gender === 'F' ? '🐄' : '🐂'}</div>
-          <div class="animal-info">
-            <div class="animal-name">${c.name ?? 'Sem nome'}</div>
-            <div class="animal-tag"># ${c.registration_id}</div>
+    let html = `
+      <div class="genealogy-tree">
+        <!-- Parents Row -->
+        <div class="tree-row">
+          <div class="tree-node parent-node ${!data.mother ? 'empty' : ''}" onclick="${data.mother ? `showAnimalDetail('${data.mother.id}')` : ''}">
+            <div class="node-icon">🐄</div>
+            <div class="node-info">
+              <div class="node-name">${data.mother ? (data.mother.name || '#' + data.mother.registration_id) : 'Mãe desconhecida'}</div>
+              <div class="node-label">Progenitora</div>
+            </div>
+          </div>
+          <div class="tree-node parent-node ${!data.father ? 'empty' : ''}" onclick="${data.father ? `showAnimalDetail('${data.father.id}')` : ''}">
+            <div class="node-icon">🐂</div>
+            <div class="node-info">
+              <div class="node-name">${data.father ? (data.father.name || '#' + data.father.registration_id) : 'Pai desconhecido'}</div>
+              <div class="node-label">Progenitor</div>
+            </div>
           </div>
         </div>
-      `).join('');
-    }
-    html += '</div></div>';
+
+        <!-- SVG Connectors -->
+        <div class="tree-connectors">
+          <svg width="100%" height="40" style="display:block">
+            <line x1="25%" y1="0" x2="50%" y2="40" stroke="var(--color-border)" stroke-width="2" />
+            <line x1="75%" y1="0" x2="50%" y2="40" stroke="var(--color-border)" stroke-width="2" />
+          </svg>
+        </div>
+
+        <!-- Current Animal -->
+        <div class="tree-row">
+          <div class="tree-node current-node">
+            <div class="node-icon">${current.gender === 'F' ? '🐄' : '🐂'}</div>
+            <div class="node-info">
+              <div class="node-name">${current.name || '#' + current.registration_id}</div>
+              <div class="node-label">Animal Atual</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Children Section -->
+        ${data.children && data.children.length > 0 ? `
+          <div class="tree-connectors">
+            <svg width="100%" height="40" style="display:block">
+              <line x1="50%" y1="0" x2="50%" y2="40" stroke="var(--color-border)" stroke-width="2" />
+            </svg>
+          </div>
+          <div class="tree-children">
+            <strong style="display:block; text-align:center; margin-bottom:12px; font-size:11px; text-transform:uppercase; color:var(--color-text-muted)">Descendentes (${data.children.length})</strong>
+            <div class="children-grid">
+              ${data.children.map(c => `
+                <div class="tree-node child-node" onclick="showAnimalDetail('${c.id}')">
+                   <div class="node-icon" style="font-size:18px">${c.gender === 'F' ? '🐄' : '🐂'}</div>
+                   <div class="node-name" style="font-size:12px">${c.name || '#' + c.registration_id}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : `
+          <div class="mt-md text-center subtext">Sem descendentes registados.</div>
+        `}
+      </div>
+    `;
     
     container.innerHTML = html;
   } catch (err) {
