@@ -5,7 +5,7 @@ pydantic-settings
 sqlalchemy
 alembic
 python-dotenv
-# psycopg2-binary  # uncomment for PostgreSQL production
+psycopg2-binary  # PostgreSQL support
 python-multipart
 passlib[bcrypt]
 python-jose[cryptography]

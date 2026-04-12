@@ -34,6 +34,9 @@ def login_access_token(
 @router.post("/register", response_model=UserOut, status_code=201)
 def register(user_in: UserCreate, db: Session = Depends(deps.get_db)) -> Any:
     """Register a new user account."""
+    import sys
+    print(f"DEBUG: Registering user_in: {user_in.model_dump()}")
+    sys.stdout.flush()
     existing = db.query(User).filter(User.email == user_in.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
