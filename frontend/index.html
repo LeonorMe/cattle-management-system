@@ -59,7 +59,7 @@
         </div>
     </div>
 
-    <div class="app-shell">
+    <main class="app-shell">
 
   <!-- ─────────────── LOADING ─────────────── -->
   <div id="page-loading" class="page active" style="align-items:center;justify-content:center;min-height:100vh;gap:16px;">
@@ -272,45 +272,45 @@
       </div>
 
       <div class="content-card mb-md p-md" style="margin-top:0">
-        <h3 class="subtext mb-sm" style="font-weight:600">Nascimentos (Comparação Anual)</h3>
-        <div style="height: 200px">
-          <canvas id="chart-births"></canvas>
-        </div>
-      </div>
+    <h3 class="subtext mb-sm" style="font-weight:600">Nascimentos (Comparação Anual)</h3>
+    <div style="height: 200px">
+        <canvas id="chart-births-annual"></canvas>
+    </div>
+</div>
 
-      <div class="stats-grid">
-        <div class="stat-card" style="border-left: 3px solid var(--color-primary)">
-          <div class="stat-value" id="stat-births-yr">—</div>
-          <div class="stat-label" style="font-size:11px">Nascimentos (Ano)</div>
-        </div>
-        <div class="stat-card" style="border-left: 3px solid var(--color-secondary)">
-          <div class="stat-value" id="stat-pregnant">—</div>
-          <div class="stat-label" style="font-size:11px">Vacas Prenhes</div>
-        </div>
-        <div class="stat-card" style="border-left: 3px solid #d97706">
-          <div class="stat-value" id="stat-fertility">—</div>
-          <div class="stat-label" style="font-size:11px">Taxa Fertilidade</div>
-        </div>
-        <div class="stat-card" style="border-left: 3px solid #8fae5c">
-          <div class="stat-value" id="stat-interval">—</div>
-          <div class="stat-label" style="font-size:11px">Inv. Partos (Médio)</div>
-        </div>
-      </div>
+<div class="stats-grid">
+    <div class="stat-card" style="border-left: 3px solid var(--color-primary)">
+        <div class="stat-value" id="stat-births-yr">—</div>
+        <div class="stat-label" style="font-size:11px">Nascimentos (Ano)</div>
+    </div>
+    <div class="stat-card" style="border-left: 3px solid var(--color-secondary)">
+        <div class="stat-value" id="stat-pregnant">—</div>
+        <div class="stat-label" style="font-size:11px">Vacas Prenhes</div>
+    </div>
+    <div class="stat-card" style="border-left: 3px solid #d97706">
+        <div class="stat-value" id="stat-fertility">—</div>
+        <div class="stat-label" style="font-size:11px">Taxa Fertilidade</div>
+    </div>
+    <div class="stat-card" style="border-left: 3px solid #8fae5c">
+        <div class="stat-value" id="stat-interval">—</div>
+        <div class="stat-label" style="font-size:11px">Inv. Partos (Médio)</div>
+    </div>
+</div>
 
-      <div class="section-header mt-lg mb-sm">
-        <h2 class="heading-md">Gráficos de Desempenho</h2>
-      </div>
-      <div class="content-card mb-lg">
-        <canvas id="chart-births" style="max-height:200px; width:100%"></canvas>
-      </div>
-      <div class="stats-grid mb-lg">
-        <div class="content-card" style="padding:var(--space-md)">
-          <canvas id="chart-status" style="max-height:150px; width:100%"></canvas>
-        </div>
-        <div class="content-card" style="padding:var(--space-md)">
-          <canvas id="chart-breed" style="max-height:150px; width:100%"></canvas>
-        </div>
-      </div>
+<div class="section-header mt-lg mb-sm">
+    <h2 class="heading-md">Gráficos de Desempenho</h2>
+</div>
+<div class="content-card mb-lg">
+    <canvas id="chart-births-trend" style="max-height:200px; width:100%"></canvas>
+</div>
+<div class="stats-grid mb-lg">
+    <div class="content-card" style="padding:var(--space-md)">
+        <canvas id="chart-status" style="max-height:150px; width:100%"></canvas>
+    </div>
+    <div class="content-card" style="padding:var(--space-md)">
+        <canvas id="chart-breed" style="max-height:150px; width:100%"></canvas>
+    </div>
+</div>
 
       <div id="page-animals" class="page">
       <div class="header" style="flex-direction:column; align-items:flex-start; height:auto; padding-bottom:var(--space-md)">
@@ -773,7 +773,7 @@
     </nav>
   </div>
 
-</div><!-- .app-shell -->
+  </main><!-- .app-shell -->
 
 <script>
   if ('serviceWorker' in navigator) {

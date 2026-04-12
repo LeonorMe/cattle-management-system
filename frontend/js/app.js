@@ -1,6 +1,13 @@
+/**
+ * Leonor's Cattle Management System
+ * Frontend Application Core (v1.2.0)
+ */
+
 const API_BASE = 'http://127.0.0.1:8000/api/v1';
 
-// ── Auth helpers ──────────────────────────────────
+/**
+ * Authentication Helper
+ */
 const auth = {
   getToken: () => localStorage.getItem('access_token'),
   setToken: (t) => localStorage.setItem('access_token', t),
@@ -8,7 +15,13 @@ const auth = {
   isLoggedIn: () => !!localStorage.getItem('access_token'),
 };
 
-// ── API client ────────────────────────────────────
+/**
+ * Generic API client with Auth and Offline support
+ * @param {string} method - HTTP method (GET, POST, etc.)
+ * @param {string} path - API endpoint path
+ * @param {object} body - Request payload
+ * @returns {Promise<any>}
+ */
 async function api(method, path, body = null, auth_token = null) {
   const headers = { 'Content-Type': 'application/json' };
   const token = auth_token ?? auth.getToken();
@@ -174,6 +187,10 @@ async function queueMutation(method, path, body) {
   showToast('Guardado localmente. Sincronizará quando estiver online.', 'info');
 }
 
+/**
+ * Replays queued offline actions once online.
+ * Handles exponential-like backoff or simple skipping on permanent failures (400s).
+ */
 async function processMutationQueue() {
   if (state.isOffline || state.mutationQueue.length === 0) return;
   
@@ -182,18 +199,28 @@ async function processMutationQueue() {
   state.mutationQueue = [];
   localStorage.setItem('mutation_queue', '[]');
 
+  const failedItems = [];
+
   for (const item of queue) {
     try {
       await api(item.method, item.path, item.body);
     } catch (err) {
       console.error('Failed to sync mutation:', err);
-      // If it fails again, put it back in queue? 
-      // For now, we'll just log it to avoid infinite loops on 400s
+      // If it's a network retry-able error, put it back. 
+      // If it's a 4xx error, it's likely a logic error so we drop it to avoid blocking the queue.
+      if (err.message === 'OFFLINE' || !err.message.includes('Server error')) {
+        failedItems.push(item);
+      }
     }
   }
   
-  // Refresh data after sync
-  initApp();
+  if (failedItems.length > 0) {
+    state.mutationQueue = [...failedItems, ...state.mutationQueue];
+    localStorage.setItem('mutation_queue', JSON.stringify(state.mutationQueue));
+  }
+  
+  // Refresh data after sync to ensure local state matches server
+  initApp(false); // don't show loading page during background sync refresh
 }
 
 // ── On Load ───────────────────────────────────────
@@ -272,9 +299,12 @@ document.querySelectorAll('.toggle-password').forEach(btn => {
   });
 });
 
-// ── App Initialization ────────────────────────────
-async function initApp() {
-  showPage('page-loading');
+/**
+ * Main application entry point. Loads user Profile, Farm, and Animals.
+ * @param {boolean} showLoading - Whether to show the full screen loading state.
+ */
+async function initApp(showLoading = true) {
+  if (showLoading) showPage('page-loading');
   
   if (state.isOffline) {
     try {
@@ -738,32 +768,9 @@ function renderEventList(events) {
   }).join('');
 }
 
-  if (!list) return;
-
-  if (animals.length === 0) {
-    list.innerHTML = `<div class="text-center" style="padding:var(--space-xl) 0; color:var(--color-text-muted)">
-      <div style="font-size:48px">🐄</div>
-      <p class="subtext" style="margin-top:var(--space-sm)">Sem animais registados ainda.</p>
-    </div>`;
-    return;
-  }
-
-  list.innerHTML = animals.map(a => `
-    <div class="animal-card mb-sm" data-id="${a.id}">
-      <div class="animal-avatar">${a.gender === 'F' ? '🐄' : '🐂'}</div>
-      <div class="animal-info">
-        <div class="animal-name">${a.name ?? 'Sem nome'}</div>
-        <div class="animal-tag"># ${a.registration_id} · ${a.breed ?? 'Raça desconhecida'}</div>
-      </div>
-      <span class="badge badge-${a.status.toLowerCase()}">${translateStatus(a.status)}</span>
-    </div>
-  `).join('');
-
-  list.querySelectorAll('.animal-card').forEach(card => {
-    card.addEventListener('click', () => showAnimalDetail(card.dataset.id));
-  });
-}
-
+/**
+ * Helper to translate English status to Portuguese.
+ */
 function translateStatus(status) {
   return { Active: 'Ativo', Sold: 'Vendido', Deceased: 'Falecido' }[status] ?? status;
 }

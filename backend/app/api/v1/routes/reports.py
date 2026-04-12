@@ -73,11 +73,12 @@ def export_events(
     current_user: User = Depends(deps.get_current_user),
     format: str = Query("xlsx")
 ) -> StreamingResponse:
-    """Export events within a date range."""
+    """
+    Export events within a date range to Excel or CSV.
+    """
     if not current_user.farm_id:
         raise HTTPException(status_code=400, detail="Not assigned to a farm")
 
-    # Get animal IDs for this farm
     animal_ids = [a.id for a in db.query(Animal.id).filter(Animal.farm_id == current_user.farm_id).all()]
     
     query = db.query(Event).filter(Event.animal_id.in_(animal_ids))
@@ -87,7 +88,6 @@ def export_events(
         query = query.filter(Event.event_date <= end_date)
         
     events = query.order_by(Event.event_date.desc()).all()
-    
     headers = ["Data", "Animal (ID)", "Tipo de Evento", "Descrição"]
 
     if format == "csv":
@@ -95,7 +95,6 @@ def export_events(
         writer = csv.writer(output)
         writer.writerow(headers)
         for e in events:
-            # Need to get animal reg_id for the report to be useful
             animal = db.query(Animal).filter(Animal.id == e.animal_id).first()
             writer.writerow([
                 e.event_date, animal.registration_id if animal else "N/A", 
@@ -127,3 +126,111 @@ def export_events(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": "attachment; filename=events_report.xlsx"}
         )
+
+@router.post("/import/animals", status_code=200)
+def import_animals(
+    file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Import or update animals from an Excel or CSV file.
+    """
+    if not current_user.farm_id:
+        raise HTTPException(status_code=400, detail="Not assigned to a farm")
+        
+    from app.models.animal import AnimalGender, AnimalStatus
+    from datetime import datetime
+    
+    content = file.file.read()
+    filename = file.filename.lower()
+    
+    rows = []
+    try:
+        if filename.endswith(".csv"):
+            text = content.decode("utf-8")
+            reader = csv.DictReader(io.StringIO(text))
+            for row in reader:
+                rows.append(row)
+        elif filename.endswith(".xlsx"):
+            wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+            ws = wb.active
+            headers = [cell.value for cell in ws[1]]
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if not row or not row[0]: continue  
+                row_dict = dict(zip(headers, row))
+                rows.append(row_dict)
+        else:
+            raise HTTPException(status_code=400, detail="Invalid file type. Only .xlsx and .csv are supported.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error parsing file: {str(e)}")
+        
+    def resolve_parent_id(reg_id):
+        if not reg_id: return None
+        parent = db.query(Animal).filter(
+            Animal.farm_id == current_user.farm_id, 
+            Animal.registration_id == str(reg_id).strip()
+        ).first()
+        return parent.id if parent else None
+        
+    imported_count = 0
+    updated_count = 0
+    
+    for row in rows:
+        reg_id = str(row.get("registration_id", "")).strip()
+        if not reg_id: continue
+        
+        name = row.get("name")
+        breed = row.get("breed")
+        gender_str = str(row.get("gender", "F")).strip().upper()
+        gender = AnimalGender.MALE if gender_str == "M" else AnimalGender.FEMALE
+        
+        birth_date_val = row.get("birth_date")
+        birth_date = None
+        if birth_date_val:
+            if isinstance(birth_date_val, datetime):
+                birth_date = birth_date_val.date()
+            else:
+                try:
+                    birth_date = datetime.strptime(str(birth_date_val).strip(), "%Y-%m-%d").date()
+                except ValueError:
+                    pass
+                    
+        status_str = str(row.get("status", "Active")).strip().capitalize()
+        status = AnimalStatus.ACTIVE
+        if status_str == "Sold": status = AnimalStatus.SOLD
+        elif status_str == "Deceased": status = AnimalStatus.DECEASED
+        
+        mother_reg_id = row.get("mother_registration_id")
+        father_reg_id = row.get("father_registration_id")
+        
+        mother_id = resolve_parent_id(mother_reg_id)
+        father_id = resolve_parent_id(father_reg_id)
+        
+        existing = db.query(Animal).filter(Animal.farm_id == current_user.farm_id, Animal.registration_id == reg_id).first()
+        if existing:
+            existing.name = name
+            existing.breed = breed
+            existing.gender = gender
+            existing.birth_date = birth_date
+            existing.status = status
+            existing.mother_id = mother_id
+            existing.father_id = father_id
+            updated_count += 1
+        else:
+            new_animal = Animal(
+                farm_id=current_user.farm_id,
+                registration_id=reg_id,
+                name=name,
+                breed=breed,
+                gender=gender,
+                birth_date=birth_date,
+                status=status,
+                mother_id=mother_id,
+                father_id=father_id
+            )
+            db.add(new_animal)
+            imported_count += 1
+            
+    db.commit()
+    return {"status": "success", "imported": imported_count, "updated": updated_count}

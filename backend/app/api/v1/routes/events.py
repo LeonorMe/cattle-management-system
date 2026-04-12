@@ -16,7 +16,10 @@ def create_bulk_events(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """Record a new event for multiple animals at once."""
+    """
+    Record the same event type for multiple animals at once.
+    Useful for batch vaccinations, transfers, etc.
+    """
     if not current_user.farm_id:
         raise HTTPException(status_code=400, detail="Not assigned to a farm")
     
@@ -48,7 +51,9 @@ def list_events(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """List all events for all animals in the current user's farm."""
+    """
+    Fetch all events for all animals belonging to the current user's farm.
+    """
     if not current_user.farm_id:
         raise HTTPException(status_code=400, detail="Not assigned to a farm")
     animal_ids = [a.id for a in db.query(Animal.id).filter(Animal.farm_id == current_user.farm_id).all()]
@@ -60,7 +65,10 @@ def create_event(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """Record a new event for an animal."""
+    """
+    Record a single event for a specific animal.
+    Verifies animal ownership before recording.
+    """
     animal = db.query(Animal).filter(
         Animal.id == event_in.animal_id,
         Animal.farm_id == current_user.farm_id
@@ -79,6 +87,9 @@ def get_event(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
+    """
+    Retrieve details of a specific event.
+    """
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -91,6 +102,9 @@ def update_event(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
+    """
+    Update an existing event record.
+    """
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -107,6 +121,9 @@ def delete_event(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> None:
+    """
+    Permanently delete an event record.
+    """
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")

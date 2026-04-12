@@ -36,16 +36,22 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 4px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.16);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.08);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.12);
+  --shadow-glass: 0 8px 32px 0 rgba(74, 103, 65, 0.1);
+
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-blur: blur(12px);
 
   /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-base: 250ms ease;
+  --transition-fast: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 350ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Typography */
-  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-sans: 'Outfit', 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
 /* ── Offline Banner ── */
@@ -598,11 +604,14 @@ label.form-label {
 .bottom-nav {
   position: sticky;
   bottom: 0;
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border-top: 1px solid var(--glass-border);
   display: flex;
   padding: var(--space-sm) 0;
+  padding-bottom: env(safe-area-inset-bottom, var(--space-sm));
   z-index: 100;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.03);
 }
 
 .nav-item {
@@ -668,15 +677,31 @@ label.form-label {
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+  transition: all var(--transition-base);
   cursor: pointer;
   text-decoration: none;
   color: inherit;
+  position: relative;
+  overflow: hidden;
+}
+
+.animal-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.4), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s;
 }
 
 .animal-card:hover {
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+  transform: translateY(-4px);
+  border-color: var(--color-primary-light);
+}
+
+.animal-card:hover::before {
+  transform: translateX(100%);
 }
 
 .animal-avatar {
