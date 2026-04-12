@@ -1,17 +1,20 @@
 // ── Cattle MS Service Worker ──────────────────────
-const CACHE_NAME = 'cattle-ms-v1';
+const CACHE_NAME = 'cattle-ms-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/css/app.css',
   '/js/app.js',
   '/manifest.json',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap',
+  'https://cdn.jsdelivr.net/npm/chart.js'
 ];
 
 // ── Install: pre-cache static assets ─────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
+      console.log('SW: Pre-caching static assets');
       return cache.addAll(STATIC_ASSETS);
     })
   );
@@ -39,7 +42,6 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
-        .then((res) => res)
         .catch(() =>
           new Response(
             JSON.stringify({ detail: 'Sem ligação à internet. A operar em modo offline.' }),
@@ -53,18 +55,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: Cache-first strategy
+  // Static assets & CDN: Stale-While-Revalidate strategy
   event.respondWith(
     caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((res) => {
-        // Cache successful GET responses for static assets
-        if (res.ok && request.method === 'GET') {
-          const cloned = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
-        }
-        return res;
-      });
+      const networked = fetch(request)
+        .then((res) => {
+          if (res.ok && request.method === 'GET') {
+            const cloned = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, cloned));
+          }
+          return res;
+        })
+        .catch(() => cached); // fallback to cache if network fails completely
+
+      return cached || networked;
     })
   );
 });

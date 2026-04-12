@@ -11,6 +11,7 @@ class User(Base):
     name = Column(String, nullable=False)
     password_hash = Column(String, nullable=False)
     farm_id = Column(String(36), ForeignKey("farms.id"), nullable=True)
+    role = Column(String, default="member")  # 'owner', 'member'
 
     farms_owned = relationship("Farm", foreign_keys="[Farm.owner_id]", back_populates="owner")
     farm = relationship("Farm", foreign_keys=[farm_id], back_populates="members")

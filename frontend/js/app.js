@@ -14,11 +14,20 @@ async function api(method, path, body = null, auth_token = null) {
   const token = auth_token ?? auth.getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : null,
-  });
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : null,
+    });
+  } catch (err) {
+    if (state.isOffline) {
+        // Handle mutation queueing within handlers for better control
+        throw new Error('OFFLINE');
+    }
+    throw err;
+  }
 
   if (res.status === 204) return null;
 
@@ -86,15 +95,105 @@ const state = {
   notifications: [],
   team: [],
   isOffline: !navigator.onLine,
+  mutationQueue: JSON.parse(localStorage.getItem('mutation_queue') || '[]'),
+};
+
+// ── IndexedDB Helper ──────────────────────────────
+const db = {
+  name: 'cattle_ms_db',
+  version: 1,
+  
+  open() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.name, this.version);
+      request.onupgradeneeded = (e) => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains('animals')) d.createObjectStore('animals', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('events'))  d.createObjectStore('events',  { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('meta'))    d.createObjectStore('meta',    { keyPath: 'key' });
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror   = () => reject(request.error);
+    });
+  },
+
+  async save(storeName, data) {
+    const d = await this.open();
+    const tx = d.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    if (Array.isArray(data)) {
+      store.clear();
+      data.forEach(item => store.put(item));
+    } else {
+      store.put(data);
+    }
+    return new Promise((res, rej) => {
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    });
+  },
+
+  async getAll(storeName) {
+    const d = await this.open();
+    return new Promise((res, rej) => {
+      const tx = d.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const req = store.getAll();
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+  },
+
+  async clear(storeName) {
+    const d = await this.open();
+    const tx = d.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).clear();
+  }
 };
 
 // ── Offline status handling ──────────────────────
-window.addEventListener('online',  () => { state.isOffline = false; updateOfflineUI(); });
-window.addEventListener('offline', () => { state.isOffline = true;  updateOfflineUI(); });
+window.addEventListener('online',  () => { 
+  state.isOffline = false; 
+  updateOfflineUI(); 
+  processMutationQueue();
+});
+window.addEventListener('offline', () => { 
+  state.isOffline = true;  
+  updateOfflineUI(); 
+});
 
 function updateOfflineUI() {
   const banner = document.getElementById('offline-indicator');
   if (banner) banner.style.display = state.isOffline ? 'block' : 'none';
+}
+
+// ── Mutation Queue (Offline Writes) ──────────────
+async function queueMutation(method, path, body) {
+  state.mutationQueue.push({ id: Date.now(), method, path, body });
+  localStorage.setItem('mutation_queue', JSON.stringify(state.mutationQueue));
+  showToast('Guardado localmente. Sincronizará quando estiver online.', 'info');
+}
+
+async function processMutationQueue() {
+  if (state.isOffline || state.mutationQueue.length === 0) return;
+  
+  showToast('A sincronizar alterações pendentes...', 'info');
+  const queue = [...state.mutationQueue];
+  state.mutationQueue = [];
+  localStorage.setItem('mutation_queue', '[]');
+
+  for (const item of queue) {
+    try {
+      await api(item.method, item.path, item.body);
+    } catch (err) {
+      console.error('Failed to sync mutation:', err);
+      // If it fails again, put it back in queue? 
+      // For now, we'll just log it to avoid infinite loops on 400s
+    }
+  }
+  
+  // Refresh data after sync
+  initApp();
 }
 
 // ── On Load ───────────────────────────────────────
@@ -176,6 +275,23 @@ document.querySelectorAll('.toggle-password').forEach(btn => {
 // ── App Initialization ────────────────────────────
 async function initApp() {
   showPage('page-loading');
+  
+  if (state.isOffline) {
+    try {
+      state.animals = await db.getAll('animals');
+      state.events  = await db.getAll('events');
+      // Note: user and farm might be in localStorage if we want, 
+      // but for now let's assume they are partially stored in state if app was already open.
+      if (state.animals.length > 0) {
+        renderDashboard();
+        showPage('page-dashboard');
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to load local data', err);
+    }
+  }
+
   try {
     // Load user profile first — if token is invalid this will throw
     state.user = await api('GET', '/users/me');
@@ -191,10 +307,12 @@ async function initApp() {
     }
     if (animalsRes.status === 'fulfilled' && Array.isArray(animalsRes.value)) {
       state.animals = animalsRes.value;
+      db.save('animals', state.animals); // Persist
     }
 
     const eventsRes = await api('GET', '/events/');
     state.events = Array.isArray(eventsRes) ? eventsRes : [];
+    db.save('events', state.events); // Persist
 
     const notifRes = await api('GET', '/notifications/');
     state.notifications = Array.isArray(notifRes) ? notifRes : [];
@@ -207,6 +325,9 @@ async function initApp() {
 
     renderDashboard();
     showPage('page-dashboard');
+    
+    // Check for pending mutations once logged in and online
+    processMutationQueue();
   } catch (err) {
     // Token expired or invalid — back to splash
     auth.clear();
@@ -256,11 +377,35 @@ function renderDashboard() {
   const elPregnant = document.getElementById('stat-pregnant');
   if (elPregnant) elPregnant.textContent = pregnantCount;
   
-  const elSold = document.getElementById('stat-sold');
-  if (elSold) elSold.textContent = sold;
-  
   const elDeceased = document.getElementById('stat-deceased');
   if (elDeceased) elDeceased.textContent = deceased;
+
+  // ── Productivity Highlights ──
+  // 1. Fertility Rate (Cows that gave birth this year / Total active females)
+  const fertilityRate = activeFemales.length > 0 ? Math.round((birthsThisYear / activeFemales.length) * 100) : 0;
+  const elFertility = document.getElementById('stat-fertility');
+  if (elFertility) elFertility.textContent = fertilityRate + '%';
+
+  // 2. Average Birth Interval (days)
+  let totalIntervalDays = 0;
+  let intervalCount = 0;
+  
+  for (const cow of activeFemales) {
+    const cowBirths = state.events
+      .filter(e => e.animal_id === cow.id && e.event_type === 'Birth')
+      .sort((a,b) => new Date(a.event_date) - new Date(b.event_date));
+      
+    if (cowBirths.length > 1) {
+        for (let i = 1; i < cowBirths.length; i++) {
+            const diff = new Date(cowBirths[i].event_date) - new Date(cowBirths[i-1].event_date);
+            totalIntervalDays += diff / (1000 * 60 * 60 * 24);
+            intervalCount++;
+        }
+    }
+  }
+  const avgInterval = intervalCount > 0 ? Math.round(totalIntervalDays / intervalCount) : '—';
+  const elInterval = document.getElementById('stat-interval');
+  if (elInterval) elInterval.textContent = avgInterval + (avgInterval !== '—' ? ' dias' : '');
 
   const farmNameEl = document.getElementById('farm-name');
   if (farmNameEl && state.farm) farmNameEl.textContent = state.farm.name;
@@ -281,14 +426,19 @@ let charts = {};
 function renderDashboardCharts() {
   if (typeof Chart === 'undefined') return;
 
-  // 1. Births per month (bar chart)
-  const birthsByMonth = new Array(12).fill(0);
+  // 1. Births comparison (current vs last year)
+  const birthsByMonthCurrent = new Array(12).fill(0);
+  const birthsByMonthLast    = new Array(12).fill(0);
   const currentYear = new Date().getFullYear();
-  state.events.filter(e => e.event_type === 'Birth' && new Date(e.event_date).getFullYear() === currentYear)
-    .forEach(e => {
-        const month = new Date(e.event_date).getMonth();
-        birthsByMonth[month]++;
-    });
+  const lastYear    = currentYear - 1;
+
+  state.events.filter(e => e.event_type === 'Birth').forEach(e => {
+    const evDate = new Date(e.event_date);
+    const evYear = evDate.getFullYear();
+    const evMonth = evDate.getMonth();
+    if (evYear === currentYear) birthsByMonthCurrent[evMonth]++;
+    else if (evYear === lastYear) birthsByMonthLast[evMonth]++;
+  });
 
   const ctxBirths = document.getElementById('chart-births');
   if (ctxBirths) {
@@ -297,14 +447,26 @@ function renderDashboardCharts() {
       type: 'bar',
       data: {
         labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-        datasets: [{
-          label: 'Nascimentos ' + currentYear,
-          data: birthsByMonth,
-          backgroundColor: 'rgba(74, 103, 65, 0.7)',
-          borderRadius: 4
-        }]
+        datasets: [
+          {
+            label: 'Nascimentos ' + currentYear,
+            data: birthsByMonthCurrent,
+            backgroundColor: 'rgba(74, 103, 65, 0.7)',
+            borderRadius: 4
+          },
+          {
+            label: 'Nascimentos ' + lastYear,
+            data: birthsByMonthLast,
+            backgroundColor: 'rgba(143, 174, 92, 0.4)',
+            borderRadius: 4
+          }
+        ]
       },
-      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+      options: { 
+        responsive: true, 
+        plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 10 } } } }, 
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } 
+      }
     });
   }
 
@@ -432,12 +594,22 @@ document.querySelectorAll('.nav-item').forEach(item => {
 async function renderSettings() {
     const farmNameEl = document.getElementById('settings-farm-name');
     const farmLocEl  = document.getElementById('settings-farm-location');
+    const invSection = document.getElementById('invitation-section');
+
     if (state.farm) {
-        farmNameEl.textContent = state.farm.name;
-        farmLocEl.textContent  = state.farm.location || 'Sem localização definida';
+        farmNameEl.textContent = farmNameEl ? state.farm.name : '';
+        farmLocEl.textContent  = farmLocEl ? (state.farm.location || 'Sem localização definida') : '';
         
         const shareIdEl = document.getElementById('share-farm-id');
         if (shareIdEl) shareIdEl.value = state.farm.id;
+
+        // Show invitation section only if owner
+        const isOwner = state.user && state.farm.owner_id === state.user.id;
+        invSection.style.display = isOwner ? 'block' : 'none';
+        
+        if (isOwner) {
+            loadInvitations();
+        }
     }
     
     // Load team members
@@ -451,6 +623,54 @@ async function renderSettings() {
         teamList.innerHTML = `<div class="subtext error-msg visible">Erro ao carregar equipa.</div>`;
     }
 }
+
+async function loadInvitations() {
+    const list = document.getElementById('invitation-list');
+    if (!list) return;
+    try {
+        const invitations = await api('GET', '/invitations/');
+        renderInvitationList(invitations);
+    } catch (err) {
+        console.error('Failed to load invitations', err);
+    }
+}
+
+function renderInvitationList(invs) {
+    const list = document.getElementById('invitation-list');
+    if (!list) return;
+
+    const pending = invs.filter(i => !i.accepted_at);
+    if (pending.length === 0) {
+        list.innerHTML = '';
+        return;
+    }
+
+    list.innerHTML = `<p class="subtext mb-sm" style="font-size:12px; font-weight:600">Convites Pendentes</p>` + 
+        pending.map(i => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed var(--color-border)">
+            <div style="font-size:13px">${i.email}</div>
+            <div class="subtext" style="font-size:11px">${i.role}</div>
+        </div>
+    `).join('');
+}
+
+document.getElementById('form-invite-member')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const emailEl = document.getElementById('invite-email');
+    const btn     = document.getElementById('btn-invite');
+    
+    setButtonLoading(btn, true);
+    try {
+        await api('POST', '/invitations/', { email: emailEl.value.trim(), role: 'member' });
+        showToast('Convite enviado!', 'success');
+        emailEl.value = '';
+        loadInvitations();
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        setButtonLoading(btn, false);
+    }
+});
 
 function renderTeamList() {
     const list = document.getElementById('team-list');
@@ -514,10 +734,21 @@ document.getElementById('form-add-animal')?.addEventListener('submit', async (e)
   try {
     const animal = await api('POST', '/animals/', payload);
     state.animals.unshift(animal);
+    db.save('animals', state.animals); // Update local cache
     showToast(`${animal.name ?? animal.registration_id} adicionado!`, 'success');
     showPage('page-dashboard');
     renderDashboard();
   } catch (err) {
+    if (err.message === 'OFFLINE') {
+      // Create a temporary animal for local UI
+      const tempAnimal = { ...payload, id: 'temp-' + Date.now() };
+      state.animals.unshift(tempAnimal);
+      db.save('animals', state.animals);
+      queueMutation('POST', '/animals/', payload);
+      showPage('page-dashboard');
+      renderDashboard();
+      return;
+    }
     errEl.textContent = err.message;
     errEl.classList.add('visible');
   } finally {
@@ -606,9 +837,19 @@ document.getElementById('form-add-event')?.addEventListener('submit', async (e) 
   try {
     const newEvent = await api('POST', '/events/', payload);
     state.events.unshift(newEvent);
+    db.save('events', state.events);
     showToast('Evento registado!', 'success');
     showAnimalDetail(animal_id);
   } catch (err) {
+    if (err.message === 'OFFLINE') {
+      const tempEvent = { ...payload, id: 'temp-' + Date.now() };
+      state.events.unshift(tempEvent);
+      db.save('events', state.events);
+      queueMutation('POST', '/events/', payload);
+      showToast('Evento guardado localmente.', 'info');
+      showAnimalDetail(animal_id);
+      return;
+    }
     errEl.textContent = err.message;
     errEl.classList.add('visible');
   } finally {
@@ -654,10 +895,19 @@ document.getElementById('form-edit-animal')?.addEventListener('submit', async (e
     // Update local state
     const index = state.animals.findIndex(a => a.id === id);
     if (index !== -1) state.animals[index] = updated;
+    db.save('animals', state.animals);
 
     showToast('Animal atualizado!', 'success');
     showAnimalDetail(id);
   } catch (err) {
+    if (err.message === 'OFFLINE') {
+      const index = state.animals.findIndex(a => a.id === id);
+      if (index !== -1) state.animals[index] = { ...state.animals[index], ...payload };
+      db.save('animals', state.animals);
+      queueMutation('PATCH', `/animals/${id}`, payload);
+      showAnimalDetail(id);
+      return;
+    }
     errEl.textContent = err.message;
     errEl.classList.add('visible');
   } finally {
@@ -671,10 +921,19 @@ async function handleDeleteAnimal(animal) {
   try {
     await api('DELETE', `/animals/${animal.id}`);
     state.animals = state.animals.filter(a => a.id !== animal.id);
+    db.save('animals', state.animals);
     showToast('Animal eliminado.', 'success');
     showPage('page-animals');
     renderAnimalList(state.animals);
   } catch (err) {
+    if (err.message === 'OFFLINE') {
+      state.animals = state.animals.filter(a => a.id !== animal.id);
+      db.save('animals', state.animals);
+      queueMutation('DELETE', `/animals/${animal.id}`);
+      showPage('page-animals');
+      renderAnimalList(state.animals);
+      return;
+    }
     showToast(err.message, 'error');
   }
 }
@@ -715,6 +974,18 @@ document.getElementById('btn-join-farm')?.addEventListener('click', async () => 
     state.farm = farm;
     showToast(`Juntou-se à quinta "${farm.name}"!`, 'success');
     showPage('page-dashboard');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+});
+
+document.getElementById('btn-accept-invite')?.addEventListener('click', async () => {
+  const token = document.getElementById('join-token').value.trim();
+  if (!token) return;
+  try {
+    const res = await api('POST', `/invitations/accept/${token}`);
+    showToast('Convite aceite com sucesso!', 'success');
+    initApp(); // Refresh everything
   } catch (err) {
     showToast(err.message, 'error');
   }
