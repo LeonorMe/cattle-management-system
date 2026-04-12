@@ -426,13 +426,32 @@ let charts = {};
 function renderDashboardCharts() {
   if (typeof Chart === 'undefined') return;
 
+  const breedFilter = document.getElementById('dashboard-breed-filter');
+  const selectedBreed = breedFilter ? breedFilter.value : '';
+  
+  // Populate breed filter only once if breeds change
+  const breeds = [...new Set(state.animals.map(a => a.breed).filter(b => !!b))];
+  if (breedFilter && breedFilter.options.length <= 1) {
+      breeds.sort().forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b;
+          opt.textContent = b;
+          breedFilter.appendChild(opt);
+      });
+      breedFilter.onchange = renderDashboardCharts;
+  }
+
+  const filteredAnimals = selectedBreed ? state.animals.filter(a => a.breed === selectedBreed) : state.animals;
+  const filteredAnimalIds = filteredAnimals.map(a => a.id);
+  const filteredEvents = selectedBreed ? state.events.filter(e => filteredAnimalIds.includes(e.animal_id)) : state.events;
+
   // 1. Births comparison (current vs last year)
   const birthsByMonthCurrent = new Array(12).fill(0);
   const birthsByMonthLast    = new Array(12).fill(0);
   const currentYear = new Date().getFullYear();
   const lastYear    = currentYear - 1;
 
-  state.events.filter(e => e.event_type === 'Birth').forEach(e => {
+  filteredEvents.filter(e => e.event_type === 'Birth').forEach(e => {
     const evDate = new Date(e.event_date);
     const evYear = evDate.getFullYear();
     const evMonth = evDate.getMonth();
@@ -465,14 +484,14 @@ function renderDashboardCharts() {
       options: { 
         responsive: true, 
         plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 12, font: { size: 10 } } } }, 
-        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } 
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } } } 
       }
     });
   }
 
   // 2. Status distribution (pie)
   const statusCounts = { Active: 0, Sold: 0, Deceased: 0 };
-  state.animals.forEach(a => statusCounts[a.status]++);
+  filteredAnimals.forEach(a => statusCounts[a.status]++);
 
   const ctxStatus = document.getElementById('chart-status');
   if (ctxStatus) {
@@ -499,22 +518,202 @@ function renderDashboardCharts() {
   const breedLabels = Object.keys(breedCounts);
   const breedData = Object.values(breedCounts);
 
-  const ctxBreed = document.getElementById('chart-breed');
-  if (ctxBreed) {
-    if (charts.breed) charts.breed.destroy();
-    charts.breed = new Chart(ctxBreed, {
-      type: 'pie',
-      data: {
-        labels: breedLabels,
-        datasets: [{
-          data: breedData,
-          backgroundColor: ['#4a6741', '#8fae5c', '#d5d9cc', '#7a9e76', '#344d30']
-        }]
-      },
-      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
-    });
+    const ctxBreed = document.getElementById('chart-breed');
+    if (ctxBreed) {
+      if (charts.breed) charts.breed.destroy();
+      charts.breed = new Chart(ctxBreed, {
+        type: 'pie',
+        data: {
+          labels: breedLabels,
+          datasets: [{
+            data: breedData,
+            backgroundColor: ['#4a6741', '#8fae5c', '#d5d9cc', '#7a9e76', '#344d30']
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+      });
+    }
   }
+
+let selectionMode = false;
+let selectedAnimals = new Set();
+
+function toggleSelectionMode() {
+    selectionMode = !selectionMode;
+    const btn = document.getElementById('btn-toggle-selection');
+    const bar = document.getElementById('bulk-action-bar');
+    
+    if (selectionMode) {
+        btn.textContent = 'Cancelar';
+        btn.classList.add('btn-primary');
+        bar.style.display = 'flex';
+        selectedAnimals.clear();
+        updateBulkCount();
+    } else {
+        btn.textContent = 'Selecionar';
+        btn.classList.remove('btn-primary');
+        bar.style.display = 'none';
+    }
+    renderAnimalList(state.animals);
 }
+
+function updateBulkCount() {
+    const el = document.getElementById('bulk-selection-count');
+    if (el) el.textContent = `${selectedAnimals.size} selecionados`;
+}
+
+// ── Search & Filters ──
+document.getElementById('animal-search')?.addEventListener('input', debounce((e) => {
+    const q = e.target.value.trim().toLowerCase();
+    if (!q) {
+        renderAnimalList(state.animals);
+        return;
+    }
+    // Simple local search for offline/fast response
+    const filtered = state.animals.filter(a => 
+        (a.name && a.name.toLowerCase().includes(q)) || 
+        a.registration_id.toLowerCase().includes(q)
+    );
+    renderAnimalList(filtered);
+}, 300));
+
+function renderAnimalList(animals) {
+  const list = document.getElementById('animal-list');
+  if (!list) return;
+
+  if (animals.length === 0) {
+    list.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">🐄</div>
+      <p>Nenhum animal encontrado.</p>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = animals.map(a => `
+    <div class="animal-card mb-sm ${selectedAnimals.has(a.id) ? 'selected' : ''}" data-id="${a.id}">
+      ${selectionMode ? `
+        <div class="selection-box">
+            <input type="checkbox" ${selectedAnimals.has(a.id) ? 'checked' : ''} onclick="event.stopPropagation()">
+        </div>
+      ` : `<div class="animal-avatar">${a.gender === 'F' ? '🐄' : '🐂'}</div>`}
+      <div class="animal-info">
+        <div class="animal-name">${a.name ?? 'Sem nome'}</div>
+        <div class="animal-tag"># ${a.registration_id} · ${a.breed ?? 'Raça desconhecida'}</div>
+      </div>
+      <span class="badge badge-${a.status.toLowerCase()}">${translateStatus(a.status)}</span>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.animal-card').forEach(card => {
+    card.addEventListener('click', () => {
+        const id = card.dataset.id;
+        if (selectionMode) {
+            if (selectedAnimals.has(id)) selectedAnimals.delete(id);
+            else selectedAnimals.add(id);
+            updateBulkCount();
+            renderAnimalList(animals);
+        } else {
+            showAnimalDetail(id);
+        }
+    });
+  });
+}
+
+function openFilters() {
+    document.getElementById('modal-filters').style.display = 'flex';
+}
+
+function closeFilters() {
+    document.getElementById('modal-filters').style.display = 'none';
+}
+
+async function applyFilters() {
+    const status = document.getElementById('filter-status').value;
+    const gender = document.getElementById('filter-gender').value;
+    const breed  = document.getElementById('filter-breed').value.trim();
+    
+    let url = '/animals/?';
+    if (status) url += `status=${status}&`;
+    if (gender) url += `gender=${gender}&`;
+    if (breed)  url += `breed=${breed}&`;
+    
+    try {
+        const filtered = await api('GET', url);
+        renderAnimalList(filtered);
+        closeFilters();
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+document.getElementById('btn-animal-filters')?.addEventListener('click', openFilters);
+document.getElementById('btn-apply-filters')?.addEventListener('click', applyFilters);
+document.getElementById('btn-reset-filters')?.addEventListener('click', () => {
+    document.getElementById('filter-status').value = '';
+    document.getElementById('filter-gender').value = '';
+    document.getElementById('filter-breed').value = '';
+    renderAnimalList(state.animals);
+    closeFilters();
+});
+
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+document.getElementById('btn-toggle-selection')?.addEventListener('click', toggleSelectionMode);
+
+document.getElementById('btn-bulk-status')?.addEventListener('click', async () => {
+    if (selectedAnimals.size === 0) return;
+    const newStatus = prompt('Novo estado para os selecionados (Ativo, Vendido, Falecido):');
+    if (!newStatus) return;
+    
+    // Normalize status
+    const normalized = newStatus.trim().charAt(0).toUpperCase() + newStatus.trim().slice(1).toLowerCase();
+    const valid = ['Active', 'Sold', 'Deceased'];
+    const dbValue = normalized === 'Ativo' ? 'Active' : (normalized === 'Vendido' ? 'Sold' : (normalized === 'Falecido' ? 'Deceased' : normalized));
+    
+    if (!valid.includes(dbValue)) {
+        alert('Estado inválido.');
+        return;
+    }
+
+    const ids = Array.from(selectedAnimals);
+    try {
+        await api('PATCH', '/animals/bulk', { animal_ids: ids, status: dbValue });
+        showToast(`Estado atualizado para ${ids.length} animais.`, 'success');
+        
+        // Update local state
+        state.animals.forEach(a => {
+            if (ids.includes(a.id)) a.status = dbValue;
+        });
+        db.save('animals', state.animals);
+        
+        toggleSelectionMode();
+        renderAnimalList(state.animals);
+    } catch (err) {
+        if (err.message === 'OFFLINE') {
+            queueMutation('PATCH', '/animals/bulk', { animal_ids: ids, status: dbValue });
+            state.animals.forEach(a => {
+                if (ids.includes(a.id)) a.status = dbValue;
+            });
+            db.save('animals', state.animals);
+            showToast('Atualização agendada localmente.', 'info');
+            toggleSelectionMode();
+            renderAnimalList(state.animals);
+        } else {
+            showToast(err.message, 'error');
+        }
+    }
+});
 
 function renderEventList(events) {
   const list = document.getElementById('event-list');
@@ -539,8 +738,6 @@ function renderEventList(events) {
   }).join('');
 }
 
-function renderAnimalList(animals) {
-  const list = document.getElementById('animal-list');
   if (!list) return;
 
   if (animals.length === 0) {
@@ -820,35 +1017,51 @@ function translateEventType(type) {
 
 document.getElementById('form-add-event')?.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const animal_id = document.getElementById('event-animal-id').value;
   const btn       = document.getElementById('btn-save-event');
   const errEl     = document.getElementById('add-event-error');
+  const animal_id = document.getElementById('event-animal-id').value;
 
   errEl.classList.remove('visible');
   setButtonLoading(btn, true);
 
+  const isBulk = state.currentBulkIds && state.currentBulkIds.length > 0;
+  
   const payload = {
-    animal_id,
     event_type:  document.getElementById('ev-type').value,
     event_date:  document.getElementById('ev-date').value,
     description: document.getElementById('ev-desc').value.trim() || null,
   };
 
   try {
-    const newEvent = await api('POST', '/events/', payload);
-    state.events.unshift(newEvent);
-    db.save('events', state.events);
-    showToast('Evento registado!', 'success');
-    showAnimalDetail(animal_id);
+    if (isBulk) {
+        await api('POST', '/events/bulk', { ...payload, animal_ids: state.currentBulkIds });
+        showToast(`Registo efetuado para ${state.currentBulkIds.length} animais.`, 'success');
+        state.currentBulkIds = null;
+        toggleSelectionMode(); // Exit selection mode
+        showPage('page-animals');
+    } else {
+        const newEvent = await api('POST', '/events/', { ...payload, animal_id });
+        state.events.unshift(newEvent);
+        db.save('events', state.events);
+        showToast('Evento registado!', 'success');
+        showAnimalDetail(animal_id);
+    }
   } catch (err) {
     if (err.message === 'OFFLINE') {
-      const tempEvent = { ...payload, id: 'temp-' + Date.now() };
-      state.events.unshift(tempEvent);
-      db.save('events', state.events);
-      queueMutation('POST', '/events/', payload);
-      showToast('Evento guardado localmente.', 'info');
-      showAnimalDetail(animal_id);
-      return;
+        if (isBulk) {
+            state.currentBulkIds.forEach(id => {
+               queueMutation('POST', '/events/', { ...payload, animal_id: id });
+            });
+            showToast('Eventos agendados para sincronização.', 'info');
+            state.currentBulkIds = null;
+            toggleSelectionMode();
+            showPage('page-animals');
+        } else {
+            queueMutation('POST', '/events/', { ...payload, animal_id });
+            showToast('Evento agendado localmente.', 'info');
+            showAnimalDetail(animal_id);
+        }
+        return;
     }
     errEl.textContent = err.message;
     errEl.classList.add('visible');
@@ -1099,25 +1312,30 @@ async function loadGenealogy(animalId) {
     
     let html = `
       <div class="genealogy-tree">
-        <!-- Parents Row -->
-        <div class="tree-row">
-          <div class="tree-node parent-node ${!data.mother ? 'empty' : ''}" onclick="${data.mother ? `showAnimalDetail('${data.mother.id}')` : ''}">
-            <div class="node-icon">🐄</div>
-            <div class="node-info">
-              <div class="node-name">${data.mother ? (data.mother.name || '#' + data.mother.registration_id) : 'Mãe desconhecida'}</div>
-              <div class="node-label">Progenitora</div>
-            </div>
-          </div>
-          <div class="tree-node parent-node ${!data.father ? 'empty' : ''}" onclick="${data.father ? `showAnimalDetail('${data.father.id}')` : ''}">
-            <div class="node-icon">🐂</div>
-            <div class="node-info">
-              <div class="node-name">${data.father ? (data.father.name || '#' + data.father.registration_id) : 'Pai desconhecido'}</div>
-              <div class="node-label">Progenitor</div>
-            </div>
-          </div>
+        <!-- Grandparents Row -->
+        <div class="tree-row" style="margin-bottom:var(--space-sm)">
+          ${renderTreeNode(data.maternal_grandfather, 'Avo Materno', '🐂', 'grandparent-node')}
+          ${renderTreeNode(data.maternal_grandmother, 'Avó Materna', '🐄', 'grandparent-node')}
+          ${renderTreeNode(data.paternal_grandfather, 'Avo Paterno', '🐂', 'grandparent-node')}
+          ${renderTreeNode(data.paternal_grandmother, 'Avó Paterna', '🐄', 'grandparent-node')}
         </div>
 
-        <!-- SVG Connectors -->
+        <div class="tree-connectors" style="height:20px">
+           <svg width="100%" height="20" style="display:block">
+              <line x1="12.5%" y1="0" x2="25%" y2="20" stroke="var(--color-border)" stroke-width="1.5" />
+              <line x1="37.5%" y1="0" x2="25%" y2="20" stroke="var(--color-border)" stroke-width="1.5" />
+              <line x1="62.5%" y1="0" x2="75%" y2="20" stroke="var(--color-border)" stroke-width="1.5" />
+              <line x1="87.5%" y1="0" x2="75%" y2="20" stroke="var(--color-border)" stroke-width="1.5" />
+           </svg>
+        </div>
+
+        <!-- Parents Row -->
+        <div class="tree-row">
+          ${renderTreeNode(data.mother, 'Mãe', '🐄', 'parent-node')}
+          ${renderTreeNode(data.father, 'Pai', '🐂', 'parent-node')}
+        </div>
+
+        <!-- SVG Connectors to Current -->
         <div class="tree-connectors">
           <svg width="100%" height="40" style="display:block">
             <line x1="25%" y1="0" x2="50%" y2="40" stroke="var(--color-border)" stroke-width="2" />
@@ -1127,13 +1345,7 @@ async function loadGenealogy(animalId) {
 
         <!-- Current Animal -->
         <div class="tree-row">
-          <div class="tree-node current-node">
-            <div class="node-icon">${current.gender === 'F' ? '🐄' : '🐂'}</div>
-            <div class="node-info">
-              <div class="node-name">${current.name || '#' + current.registration_id}</div>
-              <div class="node-label">Animal Atual</div>
-            </div>
-          </div>
+          ${renderTreeNode(current, 'Animal Atual', current.gender === 'F' ? '🐄' : '🐂', 'current-node')}
         </div>
 
         <!-- Children Section -->

@@ -12,6 +12,12 @@ class EventBase(BaseModel):
 class EventCreate(EventBase):
     pass
 
+class EventBulkCreate(BaseModel):
+    animal_ids: List[str]
+    event_type: EventType
+    event_date: date
+    description: Optional[str] = None
+
 class EventUpdate(BaseModel):
     description: Optional[str] = None
     event_date: Optional[date] = None

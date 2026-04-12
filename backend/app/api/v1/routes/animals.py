@@ -9,9 +9,36 @@ import openpyxl
 from app.api import deps
 from app.models.animal import Animal, AnimalGender, AnimalStatus
 from app.models.user import User
-from app.schemas.animal import AnimalCreate, AnimalUpdate, AnimalOut
+from app.schemas.animal import AnimalCreate, AnimalUpdate, AnimalOut, AnimalBulkUpdate
 
 router = APIRouter()
+
+@router.patch("/bulk", status_code=200)
+def update_bulk_animals(
+    update_in: AnimalBulkUpdate,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Update status or breed for multiple animals at once."""
+    if not current_user.farm_id:
+        raise HTTPException(status_code=400, detail="Not assigned to a farm")
+    
+    animals = db.query(Animal).filter(
+        Animal.id.in_(update_in.animal_ids),
+        Animal.farm_id == current_user.farm_id
+    ).all()
+    
+    if len(animals) != len(update_in.animal_ids):
+        raise HTTPException(status_code=404, detail="One or more animals not found in your farm")
+    
+    for animal in animals:
+        if update_in.status is not None:
+            animal.status = update_in.status
+        if update_in.breed is not None:
+            animal.breed = update_in.breed
+            
+    db.commit()
+    return {"status": "success", "count": len(animals)}
 
 def _get_farm_animal(animal_id: str, db: Session, farm_id: str) -> Animal:
     animal = db.query(Animal).filter(
@@ -28,15 +55,27 @@ def list_animals(
     current_user: User = Depends(deps.get_current_user),
     status: Optional[str] = Query(None),
     gender: Optional[str] = Query(None),
+    breed: Optional[str] = Query(None),
+    q: Optional[str] = Query(None, description="Search by name or registration ID"),
 ) -> Any:
     """List all animals in the current user's farm."""
     if not current_user.farm_id:
         raise HTTPException(status_code=400, detail="You are not assigned to a farm")
+    
     query = db.query(Animal).filter(Animal.farm_id == current_user.farm_id)
+    
     if status:
         query = query.filter(Animal.status == status)
     if gender:
         query = query.filter(Animal.gender == gender)
+    if breed:
+        query = query.filter(Animal.breed.ilike(f"%{breed}%"))
+    if q:
+        search = f"%{q}%"
+        query = query.filter(
+            (Animal.name.ilike(search)) | (Animal.registration_id.ilike(search))
+        )
+        
     return query.all()
 
 @router.post("/", response_model=AnimalOut, status_code=201)
@@ -96,19 +135,22 @@ def delete_animal(
     db.delete(animal)
     db.commit()
 
-@router.get("/{animal_id}/genealogy", response_model=Any)
+@router.get("/{animal_id}/genealogy", response_model=GenealogyOut)
 def get_animal_genealogy(
     animal_id: str,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """Get parents and children of an animal."""
+    """Get parents, grandparents and children of an animal."""
     animal = _get_farm_animal(animal_id, db, current_user.farm_id)
     
-    # We already have relationships `mother` and `father` defined on the model
-    # and backrefs `children_as_mother` and `children_as_father`.
     mother = animal.mother
     father = animal.father
+    
+    maternal_grandfather = mother.father if mother else None
+    maternal_grandmother = mother.mother if mother else None
+    paternal_grandfather = father.father if father else None
+    paternal_grandmother = father.mother if father else None
     
     children = []
     if animal.gender.value == 'F':
@@ -116,10 +158,13 @@ def get_animal_genealogy(
     else:
         children = animal.children_as_father
         
-    from app.schemas.animal import GenealogyOut
     return GenealogyOut(
         mother=mother,
         father=father,
+        maternal_grandfather=maternal_grandfather,
+        maternal_grandmother=maternal_grandmother,
+        paternal_grandfather=paternal_grandfather,
+        paternal_grandmother=paternal_grandmother,
         children=children
     )
 

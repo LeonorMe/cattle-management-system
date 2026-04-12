@@ -6,9 +6,42 @@ from app.api import deps
 from app.models.event import Event
 from app.models.animal import Animal
 from app.models.user import User
-from app.schemas.event import EventCreate, EventUpdate, EventOut
+from app.schemas.event import EventCreate, EventUpdate, EventOut, EventBulkCreate
 
 router = APIRouter()
+
+@router.post("/bulk", status_code=201)
+def create_bulk_events(
+    events_in: EventBulkCreate,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Record a new event for multiple animals at once."""
+    if not current_user.farm_id:
+        raise HTTPException(status_code=400, detail="Not assigned to a farm")
+    
+    # Verify all animals belong to this farm
+    animals = db.query(Animal).filter(
+        Animal.id.in_(events_in.animal_ids),
+        Animal.farm_id == current_user.farm_id
+    ).all()
+    
+    if len(animals) != len(events_in.animal_ids):
+        raise HTTPException(status_code=404, detail="One or more animals not found in your farm")
+    
+    new_events = []
+    for animal_id in events_in.animal_ids:
+        event = Event(
+            animal_id=animal_id,
+            event_type=events_in.event_type,
+            event_date=events_in.event_date,
+            description=events_in.description
+        )
+        db.add(event)
+        new_events.append(event)
+    
+    db.commit()
+    return {"status": "success", "count": len(new_events)}
 
 @router.get("/", response_model=List[EventOut])
 def list_events(

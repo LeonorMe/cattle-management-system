@@ -20,7 +20,46 @@
 
 <div id="toast-container" class="toast-container"></div>
 
-<div class="app-shell">
+    <!-- Advanced Filters Modal -->
+    <div id="modal-filters" class="modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:flex-end">
+        <div class="modal-content" style="background:white; width:100%; max-width:480px; margin:0 auto; border-radius:20px 20px 0 0; padding:var(--space-lg); animation: slide-up 0.3s ease">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-lg)">
+                <h3 class="heading-md">Filtros Avançados</h3>
+                <button class="btn btn-sm btn-ghost" style="width:auto" onclick="closeFilters()">Fechar</button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Estado</label>
+                <select id="filter-status" class="form-input">
+                    <option value="">Todos</option>
+                    <option value="Active">Ativo</option>
+                    <option value="Sold">Vendido</option>
+                    <option value="Deceased">Falecido</option>
+                </select>
+            </div>
+
+            <div class="form-group mt-md">
+                <label class="form-label">Género</label>
+                <select id="filter-gender" class="form-input">
+                    <option value="">Todos</option>
+                    <option value="F">Fêmea</option>
+                    <option value="M">Macho</option>
+                </select>
+            </div>
+
+            <div class="form-group mt-md">
+                <label class="form-label">Raça</label>
+                <input type="text" id="filter-breed" class="form-input" placeholder="Ex: Angus, Limousine...">
+            </div>
+
+            <div style="display:flex; gap:12px; margin-top:var(--space-xl)">
+                <button class="btn btn-ghost" style="flex:1" id="btn-reset-filters">Limpar</button>
+                <button class="btn btn-primary" style="flex:1" id="btn-apply-filters">Aplicar Filtros</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-shell">
 
   <!-- ─────────────── LOADING ─────────────── -->
   <div id="page-loading" class="page active" style="align-items:center;justify-content:center;min-height:100vh;gap:16px;">
@@ -225,9 +264,20 @@
         </div>
       </div>
 
-      <div class="section-header mt-lg mb-sm">
-        <h2 class="heading-md">Produtividade</h2>
+      <div class="section-header mt-lg d-flex justify-between align-center">
+        <h2 class="heading-md">Métricas de Produtividade</h2>
+        <select id="dashboard-breed-filter" class="form-input btn-sm" style="width:auto; padding-right:30px">
+            <option value="">Todas as Raças</option>
+        </select>
       </div>
+
+      <div class="content-card mb-md p-md" style="margin-top:0">
+        <h3 class="subtext mb-sm" style="font-weight:600">Nascimentos (Comparação Anual)</h3>
+        <div style="height: 200px">
+          <canvas id="chart-births"></canvas>
+        </div>
+      </div>
+
       <div class="stats-grid">
         <div class="stat-card" style="border-left: 3px solid var(--color-primary)">
           <div class="stat-value" id="stat-births-yr">—</div>
@@ -262,12 +312,40 @@
         </div>
       </div>
 
-      <div class="section-header mt-lg mb-sm">
-        <h2 class="heading-md">Animais recentes</h2>
-        <button class="btn btn-sm btn-ghost" style="width:auto" data-page="page-animals">Ver todos</button>
+      <div id="page-animals" class="page">
+      <div class="header" style="flex-direction:column; align-items:flex-start; height:auto; padding-bottom:var(--space-md)">
+        <div style="display:flex; justify-content:space-between; width:100%; align-items:center; margin-bottom:var(--space-sm)">
+            <h2 class="heading-md">O Meu Gado</h2>
+            <div style="display:flex; gap:8px">
+                <button class="btn btn-sm btn-outline-secondary" id="btn-toggle-selection">Selecionar</button>
+                <button class="btn btn-primary btn-fab" style="position:static; width:40px; height:40px" onclick="showPage('page-add-animal')">+</button>
+            </div>
+        </div>
+        
+        <div style="display:flex; gap:8px; width:100%">
+            <div class="input-wrapper" style="flex:1">
+                <span class="input-icon">🔍</span>
+                <input type="text" id="animal-search" placeholder="Procurar por ID ou Nome..." style="padding:10px 12px 10px 36px">
+            </div>
+            <button class="btn btn-ghost" id="btn-animal-filters" style="width:auto; padding:0 12px">
+                <span style="font-size:20px">⚙️</span>
+            </button>
+        </div>
       </div>
-      <div id="animal-list" class="mb-lg"></div>
 
+      <!-- Bulk Actions Bar (Sticky) -->
+      <div id="bulk-action-bar" style="display:none; position:fixed; bottom:80px; left:var(--space-md); right:var(--space-md); background:var(--color-primary); color:white; padding:12px 20px; border-radius:12px; justify-content:space-between; align-items:center; z-index:100; box-shadow:0 4px 12px rgba(0,0,0,0.2)">
+          <div id="bulk-selection-count" style="font-weight:600">0 selecionados</div>
+          <div style="display:flex; gap:8px">
+              <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none" id="btn-bulk-event">Registar Evento</button>
+              <button class="btn btn-sm" style="background:rgba(255,255,255,0.2); color:white; border:none" id="btn-bulk-status">Estado</button>
+          </div>
+      </div>
+
+      <div id="animal-list" class="mt-md" style="padding-bottom:100px">
+        <!-- Herd cards go here -->
+      </div>
+    </div>
       <div class="section-header">
         <h2 class="heading-md">Eventos recentes</h2>
       </div>
@@ -429,6 +507,52 @@
           <button class="btn btn-primary" id="btn-save-event" type="submit">Guardar evento</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ─────────────── REPORTS ─────────────── -->
+  <div id="page-reports" class="page">
+    <div class="app-bar">
+      <button class="btn btn-icon btn-ghost" onclick="showPage('page-dashboard')" style="font-size:20px;">←</button>
+      <span class="app-bar-title">Central de Relatórios</span>
+      <div style="width:40px;"></div>
+    </div>
+
+    <div class="scrollable">
+      <p class="subtext mb-lg">Exporte os seus dados para análise externa ou para o seu veterinário.</p>
+
+      <!-- Herd Report Card -->
+      <div class="content-card mb-md" style="padding:var(--space-md); border-left: 4px solid var(--color-primary);">
+        <h3 class="heading-md" style="display:flex; align-items:center; gap:8px;">
+          <span>🐄</span> Lista do Efetivo
+        </h3>
+        <p class="subtext mt-xs">Todos os animais ativos, vendidos e falecidos.</p>
+        <div style="display:flex; gap:8px; margin-top:var(--space-md)">
+          <button class="btn btn-sm btn-ghost" onclick="downloadReport('herd', 'xlsx')">Excel (.xlsx)</button>
+          <button class="btn btn-sm btn-ghost" onclick="downloadReport('herd', 'csv')">CSV</button>
+        </div>
+      </div>
+
+      <!-- Events Report Card -->
+      <div class="content-card mb-md" style="padding:var(--space-md); border-left: 4px solid var(--color-accent);">
+        <h3 class="heading-md" style="display:flex; align-items:center; gap:8px;">
+          <span>📋</span> Histórico de Atividade
+        </h3>
+        <p class="subtext mt-xs">Relatório de vacinações, tratamentos e nascimentos.</p>
+        
+        <div style="display:flex; gap:8px; margin-top:var(--space-md)">
+            <div class="form-group flex-1">
+                <label class="form-label">De:</label>
+                <input type="date" id="report-start" class="form-input btn-sm">
+            </div>
+            <div class="form-group flex-1">
+                <label class="form-label">Até:</label>
+                <input type="date" id="report-end" class="form-input btn-sm">
+            </div>
+        </div>
+
+        <button class="btn btn-primary btn-sm mt-md w-full" onclick="downloadReport('events', 'xlsx')">Exportar Eventos (Excel)</button>
+      </div>
     </div>
   </div>
 

@@ -24,6 +24,11 @@ class AnimalUpdate(BaseModel):
     mother_id: Optional[str] = None
     father_id: Optional[str] = None
 
+class AnimalBulkUpdate(BaseModel):
+    animal_ids: List[str]
+    status: Optional[AnimalStatus] = None
+    breed: Optional[str] = None
+
 class AnimalOut(AnimalBase):
     id: str
     farm_id: str
@@ -34,6 +39,10 @@ class AnimalOut(AnimalBase):
 class GenealogyOut(BaseModel):
     mother: Optional[AnimalOut] = None
     father: Optional[AnimalOut] = None
+    maternal_grandfather: Optional[AnimalOut] = None
+    maternal_grandmother: Optional[AnimalOut] = None
+    paternal_grandfather: Optional[AnimalOut] = None
+    paternal_grandmother: Optional[AnimalOut] = None
     children: list[AnimalOut] = []
 
     class Config:
